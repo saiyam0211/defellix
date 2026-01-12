@@ -1,1 +1,0 @@
-# decentralized_freelancer_trust_platform
