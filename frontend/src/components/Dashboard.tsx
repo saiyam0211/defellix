@@ -1,10 +1,11 @@
-import { FaRegStar } from "react-icons/fa6";
-import { AiOutlineAim } from "react-icons/ai";
 
 
+import { IoMdTrendingUp } from "react-icons/io";
 
 
 const Dashboard = () => {
+
+
     return (
         <div className="flex-1 bg-[#fbf9f1] flex flex-col h-screen overflow-y-scroll">
             <header className="bg-[#fbf9f1] px-8 py-9 w-full">
@@ -31,54 +32,68 @@ const Dashboard = () => {
                 </div>
             </header>
 
-       
+
             <main className="">
 
-                <div className="flex gap-10">
+                <div className="flex gap-5">
 
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6! w-90 h-70 ">
-                        <div className="flex items-center justify-between mb-4!">
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-90 h-70 ml-10 ">
+                        <div className="flex items-center justify-center  mb-4">
 
-                            <h3 className="text-sm font-semibold text-gray-700">Reputation Score</h3>
-                            <FaRegStar className="text-teal-600 h-4 w-6" />
+                            <h3 className="text-2xl  font-semibold text-gray-700  ">Reputation Score</h3>
+
 
                         </div>
-                        <div className="flex items-center justify-between mb-4 ">
-                            <div className="relative w-12 h-12">
-                                
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="text-3xl ml-12! font-bold text-gray-900">100</span>
+
+
+
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-3xl ml-12! font-bold text-gray-900">100</span>
+                        </div>
+                        <div className="flex justify-center">
+                            <div className="radial-progress text-teal-600 " style={{ "--value": `70`, "--size": "7rem", "--thickness": "10px" } /* as React.CSSProperties */} aria-valuenow={70} role="progressbar">
+                                70%
+                            </div>
+                        </div>
+
+
+
+                        <div className="text-center mt-5 ">
+                            <p className="text-md font-medium  text-gray-900">Rising Talent</p>
+
+
+                            <div className="flex justify-center">
+                                <div className="flex items-center gap-1 bg-teal-300 px-2 rounded-xl">
+                                    <IoMdTrendingUp className="text-teal-700" />
+                                    <p className="text-[8px] text-gray-700">5% growth</p>
                                 </div>
                             </div>
-                            <div className="text-center ">
-                                <p className="text-sm font-medium  text-gray-900">Rising Talent</p>
-                                <p className="text-xs text-gray-500 mt-1">Top 15% this month</p>
-                            </div>
+
                         </div>
 
                     </div>
 
-                  
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6! w-[500px]">
-                       
-                       
-                   
+
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6! w-[620px]">
+
+
+
                     </div>
 
-                  
-                 
+
+
                 </div>
 
                 <div className="p-6!">
-                   
+
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6!">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-lg font-semibold text-gray-900">Recent Contracts</h3>
-                           
+
                         </div>
 
                         <div className="space-y-4!">
-                        
+
                             <div className="flex items-start gap-4 p-4! hover:bg-teal-50 rounded-lg cursor-pointer">
                                 <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#3B82F6" strokeWidth="1.5">
@@ -87,8 +102,8 @@ const Dashboard = () => {
                                 </div>
                                 <div className="flex-1 justify-between flex">
                                     <div>
-                                       <h4 className="font-semibold text-gray-900 mb-1">E-Commerce React Frontend</h4>
-                                       <p className="text-sm text-gray-600 mb-2">Client: Sarah Miller | Updated 2h ago</p>
+                                        <h4 className="font-semibold text-gray-900 mb-1">E-Commerce React Frontend</h4>
+                                        <p className="text-sm text-gray-600 mb-2">Client: Sarah Miller | Updated 2h ago</p>
                                     </div>
                                     <div className="flex items-center ">
                                         <div className="flex flex-col">
@@ -99,7 +114,7 @@ const Dashboard = () => {
                                 </div>
                             </div>
 
-                           
+
                             <div className="flex items-start gap-4 p-4! hover:bg-teal-50 rounded-lg cursor-pointer">
                                 <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#3B82F6" strokeWidth="1.5">
@@ -108,8 +123,8 @@ const Dashboard = () => {
                                 </div>
                                 <div className="flex-1 justify-between flex">
                                     <div>
-                                       <h4 className="font-semibold text-gray-900 mb-1">E-Commerce React Frontend</h4>
-                                       <p className="text-sm text-gray-600 mb-2">Client: Sarah Miller | Completed</p>
+                                        <h4 className="font-semibold text-gray-900 mb-1">E-Commerce React Frontend</h4>
+                                        <p className="text-sm text-gray-600 mb-2">Client: Sarah Miller | Completed</p>
                                     </div>
                                     <div className="flex items-center ">
                                         <div className="flex flex-col">
@@ -120,13 +135,13 @@ const Dashboard = () => {
                                 </div>
                             </div>
 
-                       
-                            
+
+
                         </div>
                     </div>
 
-                   
-                     
+
+
                 </div>
             </main>
         </div>
