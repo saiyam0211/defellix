@@ -1,6 +1,7 @@
 
 
 import { IoMdTrendingUp } from "react-icons/io";
+import {Link} from "react-router-dom"
 
 
 const Dashboard = () => {
@@ -17,7 +18,7 @@ const Dashboard = () => {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <button className="cursor-pointer bg-teal-600 w-35  hover:bg-teal-700 text-white p-1! rounded-lg font-medium flex items-center gap-2">
+                        <button  className="cursor-pointer bg-teal-600 w-35  hover:bg-teal-700 text-white p-1! rounded-lg font-medium flex items-center gap-2">
                             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2">
                                 <line x1="9" y1="3" x2="9" y2="15" />
                                 <line x1="3" y1="9" x2="15" y2="9" />
@@ -86,7 +87,9 @@ const Dashboard = () => {
 
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6!">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-semibold text-gray-900">Recent Contracts</h3>
+                            <h3 className="text-lg font-semibold text-gray-900 ml-5">Recent Contracts</h3>
+                           
+                            <Link to="/myprofile"  className="text-sm font-bold text-white bg-teal-300 px-2 py-1 rounded-2xl mr-4"> View all</Link>
 
                         </div>
 
