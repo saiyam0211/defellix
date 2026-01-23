@@ -10,6 +10,7 @@ type Config struct {
 	Server   ServerConfig
 	App      AppConfig
 	Database DatabaseConfig
+	JWT      JWTConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -27,13 +28,21 @@ type AppConfig struct {
 	LogLevel    string
 }
 
-// DatabaseConfig holds database configuration (for future use)
+// DatabaseConfig holds database configuration
 type DatabaseConfig struct {
 	Host     string
 	Port     string
 	User     string
 	Password string
 	DBName   string
+	SSLMode  string // sslmode for PostgreSQL (disable, require, verify-full, etc.)
+}
+
+// JWTConfig holds JWT configuration
+type JWTConfig struct {
+	SecretKey       string
+	AccessTokenTTL  int // in hours
+	RefreshTokenTTL int // in days
 }
 
 // Load reads configuration from environment variables with defaults
@@ -56,6 +65,12 @@ func Load() *Config {
 			User:     getEnv("DB_USER", "freelancer"),
 			Password: getEnv("DB_PASSWORD", "secret"),
 			DBName:   getEnv("DB_NAME", "auth_db"),
+			SSLMode:  getEnv("DB_SSLMODE", "disable"), // disable for local, require for Neon/RDS
+		},
+		JWT: JWTConfig{
+			SecretKey:       getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+			AccessTokenTTL:  getEnvAsInt("JWT_ACCESS_TTL_HOURS", 24),
+			RefreshTokenTTL: getEnvAsInt("JWT_REFRESH_TTL_DAYS", 7),
 		},
 	}
 }

@@ -12,14 +12,47 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/joho/godotenv"
 	"github.com/saiyam0211/defellix/services/auth-service/internal/config"
+	"github.com/saiyam0211/defellix/services/auth-service/internal/domain"
 	"github.com/saiyam0211/defellix/services/auth-service/internal/handler"
 	appmw "github.com/saiyam0211/defellix/services/auth-service/internal/middleware"
+	"github.com/saiyam0211/defellix/services/auth-service/internal/repository"
+	"github.com/saiyam0211/defellix/services/auth-service/internal/service"
+	"github.com/saiyam0211/defellix/services/auth-service/pkg/jwt"
 )
 
 func main() {
+	// Load environment variables
+	godotenv.Load()
+
 	// Load configuration
 	cfg := config.Load()
+
+	// Initialize database
+	db, err := config.InitDB(cfg)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+
+	// Run migrations
+	if err := config.AutoMigrate(db, &domain.User{}); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("Database migrations completed")
+
+	// Initialize JWT manager
+	jwtManager := jwt.NewJWTManager(
+		cfg.JWT.SecretKey,
+		time.Duration(cfg.JWT.AccessTokenTTL)*time.Hour,
+		time.Duration(cfg.JWT.RefreshTokenTTL)*24*time.Hour,
+	)
+
+	// Initialize repository
+	userRepo := repository.NewUserRepository(db)
+
+	// Initialize service
+	authService := service.NewAuthService(userRepo, jwtManager)
 
 	// Create router
 	r := chi.NewRouter()
@@ -28,7 +61,7 @@ func main() {
 	setupMiddleware(r)
 
 	// Setup routes
-	setupRoutes(r)
+	setupRoutes(r, authService, jwtManager)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -88,12 +121,12 @@ func setupMiddleware(r *chi.Mux) {
 }
 
 // setupRoutes configures all application routes
-func setupRoutes(r *chi.Mux) {
+func setupRoutes(r *chi.Mux, authService *service.AuthService, jwtManager *jwt.JWTManager) {
 	// Health check handler
 	healthHandler := handler.NewHealthHandler()
 	healthHandler.RegisterRoutes(r)
 
 	// Auth handler
-	authHandler := handler.NewAuthHandler()
-	authHandler.RegisterRoutes(r)
+	authHandler := handler.NewAuthHandler(authService)
+	authHandler.RegisterRoutes(r, jwtManager)
 }

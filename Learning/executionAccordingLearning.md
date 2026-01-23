@@ -390,29 +390,423 @@ respondError(w, http.StatusBadRequest, "Error message", "ERROR_CODE")
 
 ---
 
-### 🔄 What's Next (Week 2)
+---
 
-- PostgreSQL database integration
-- GORM ORM setup
-- User model and repository
-- Password hashing with bcrypt
-- JWT token generation
-- Authentication middleware implementation
+## 📚 Week 2 - Phase 1: Database & JWT Authentication
+
+**Duration:** Days 8-14  
+**Goal:** Implement PostgreSQL integration, password hashing, JWT authentication, and OAuth stubs
+
+---
+
+### 🗄️ Database Integration
+
+#### PostgreSQL + GORM Setup
+
+**What we learned:**
+- GORM is a powerful ORM for Go that simplifies database operations
+- Database migrations ensure schema consistency
+- Connection pooling is handled automatically by GORM
+
+**Implementation:**
+```go
+// Database connection
+dsn := fmt.Sprintf(
+    "host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
+    cfg.Database.Host, cfg.Database.User, cfg.Database.Password,
+    cfg.Database.DBName, cfg.Database.Port,
+)
+
+db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+    Logger: logger.Default.LogMode(logLevel),
+})
+```
+
+**Auto Migration:**
+```go
+// Run migrations on startup
+config.AutoMigrate(db, &domain.User{})
+```
+
+**Key Concepts:**
+- **DSN (Data Source Name):** Connection string format for PostgreSQL
+- **Auto Migration:** Automatically creates/updates database schema
+- **GORM Logger:** Configurable logging for SQL queries (useful in development)
+
+**Why GORM?**
+- Type-safe database operations
+- Automatic migration support
+- Relationship management
+- Query builder with chainable methods
+- Works with multiple databases (PostgreSQL, MySQL, SQLite)
+
+---
+
+### 👤 User Domain Model
+
+**What we learned:**
+- Domain models represent core business entities
+- GORM tags define database schema
+- Soft deletes preserve data integrity
+
+**User Model:**
+```go
+type User struct {
+    ID        uint           `gorm:"primaryKey" json:"id"`
+    Email     string         `gorm:"uniqueIndex;not null" json:"email"`
+    Password  string         `gorm:"not null" json:"-"` // Never return in JSON
+    FullName  string         `gorm:"not null" json:"full_name"`
+    Role      string         `gorm:"default:user" json:"role"`
+    IsActive  bool           `gorm:"default:true" json:"is_active"`
+    CreatedAt time.Time      `json:"created_at"`
+    UpdatedAt time.Time      `json:"updated_at"`
+    DeletedAt gorm.DeletedAt `gorm:"index" json:"-"` // Soft delete
+}
+```
+
+**Key Features:**
+- **Primary Key:** Auto-incrementing ID
+- **Unique Index:** Email must be unique
+- **Soft Delete:** Uses `DeletedAt` for logical deletion
+- **Timestamps:** Automatic `CreatedAt` and `UpdatedAt`
+- **Password Exclusion:** `json:"-"` prevents password in API responses
+
+---
+
+### 🏗️ Repository Pattern
+
+**What we learned:**
+- Repository pattern abstracts data access
+- Interface-based design enables testing with mocks
+- Error handling with custom error types
+
+**Repository Interface:**
+```go
+type UserRepository interface {
+    Create(user *domain.User) error
+    FindByID(id uint) (*domain.User, error)
+    FindByEmail(email string) (*domain.User, error)
+    Update(user *domain.User) error
+    Delete(id uint) error
+}
+```
+
+**Implementation Benefits:**
+- **Testability:** Easy to mock for unit tests
+- **Flexibility:** Can swap database implementations
+- **Separation:** Business logic doesn't depend on database details
+
+**Error Handling:**
+```go
+var (
+    ErrUserNotFound = errors.New("user not found")
+    ErrUserExists   = errors.New("user already exists")
+)
+```
+
+---
+
+### 🔐 Password Hashing with bcrypt
+
+**What we learned:**
+- Never store passwords in plain text
+- bcrypt provides secure one-way hashing
+- Cost factor controls hashing complexity
+
+**Password Hashing:**
+```go
+// Hash password during registration
+hashedPassword, err := bcrypt.GenerateFromPassword(
+    []byte(req.Password), 
+    bcrypt.DefaultCost, // Cost factor: 10
+)
+```
+
+**Password Verification:**
+```go
+// Verify password during login
+err := bcrypt.CompareHashAndPassword(
+    []byte(user.Password), 
+    []byte(req.Password),
+)
+```
+
+**Key Concepts:**
+- **One-Way Hash:** Cannot reverse to get original password
+- **Salt:** Automatically generated and included in hash
+- **Cost Factor:** Higher cost = more secure but slower (default: 10)
+- **Timing Attack Protection:** Constant-time comparison
+
+**Why bcrypt?**
+- Industry standard for password hashing
+- Adaptive cost factor
+- Built-in salt generation
+- Resistant to rainbow table attacks
+
+---
+
+### 🎫 JWT Token Management
+
+**What we learned:**
+- JWT (JSON Web Tokens) for stateless authentication
+- Access tokens for API requests
+- Refresh tokens for obtaining new access tokens
+- Token expiration and validation
+
+**JWT Claims Structure:**
+```go
+type Claims struct {
+    UserID   uint   `json:"user_id"`
+    Email    string `json:"email"`
+    Role     string `json:"role"`
+    jwt.RegisteredClaims
+}
+```
+
+**Token Generation:**
+```go
+// Access token (short-lived, e.g., 24 hours)
+accessToken, err := jwtManager.GenerateAccessToken(userID, email, role)
+
+// Refresh token (long-lived, e.g., 7 days)
+refreshToken, err := jwtManager.GenerateRefreshToken(userID, email, role)
+```
+
+**Token Validation:**
+```go
+claims, err := jwtManager.ValidateToken(tokenString)
+if err != nil {
+    // Handle invalid/expired token
+}
+```
+
+**JWT Structure:**
+- **Header:** Algorithm and token type
+- **Payload:** Claims (user data, expiration, etc.)
+- **Signature:** HMAC signature for verification
+
+**Token Lifecycle:**
+1. User logs in → Receive access + refresh tokens
+2. Use access token for API requests
+3. Access token expires → Use refresh token to get new tokens
+4. Refresh token expires → User must login again
+
+**Security Considerations:**
+- Store secret key securely (environment variable)
+- Use HTTPS in production
+- Set appropriate expiration times
+- Implement token blacklisting for logout (future)
+
+---
+
+### 🛡️ Authentication Middleware
+
+**What we learned:**
+- Middleware validates JWT tokens on protected routes
+- Context values pass user info to handlers
+- Bearer token format: `Authorization: Bearer <token>`
+
+**Implementation:**
+```go
+func RequireAuth(jwtManager *jwt.JWTManager) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            // Extract Bearer token
+            authHeader := r.Header.Get("Authorization")
+            tokenString := strings.Split(authHeader, " ")[1]
+            
+            // Validate token
+            claims, err := jwtManager.ValidateToken(tokenString)
+            
+            // Add user info to context
+            ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
+            next.ServeHTTP(w, r.WithContext(ctx))
+        })
+    }
+}
+```
+
+**Usage:**
+```go
+r.With(middleware.RequireAuth(jwtManager)).Get("/me", h.Me)
+```
+
+**Context Values:**
+- `user_id`: User ID from token
+- `user_email`: User email from token
+- `user_role`: User role from token
+
+---
+
+### 🔄 Service Layer
+
+**What we learned:**
+- Service layer contains business logic
+- Coordinates between repository and external services
+- Handles business rules and validations
+
+**Auth Service Methods:**
+```go
+type AuthService struct {
+    userRepo   repository.UserRepository
+    jwtManager *jwt.JWTManager
+}
+
+// Register: Create user, hash password, generate tokens
+func (s *AuthService) Register(req *dto.RegisterRequest) (*dto.AuthResponse, error)
+
+// Login: Verify credentials, generate tokens
+func (s *AuthService) Login(req *dto.LoginRequest) (*dto.AuthResponse, error)
+
+// RefreshToken: Validate refresh token, generate new tokens
+func (s *AuthService) RefreshToken(refreshToken string) (*dto.AuthResponse, error)
+```
+
+**Business Logic Flow:**
+1. **Register:**
+   - Check if user exists
+   - Hash password
+   - Create user in database
+   - Generate JWT tokens
+   - Return tokens
+
+2. **Login:**
+   - Find user by email
+   - Check if user is active
+   - Verify password
+   - Generate JWT tokens
+   - Return tokens
+
+3. **Refresh:**
+   - Validate refresh token
+   - Find user
+   - Check if user is active
+   - Generate new tokens
+   - Return tokens
+
+---
+
+### 🔗 OAuth Integration Stubs
+
+**What we learned:**
+- OAuth allows users to login with third-party providers
+- Stub endpoints prepare for future implementation
+- Google and LinkedIn are common OAuth providers
+
+**OAuth Endpoints (Stubs):**
+```go
+// Google OAuth
+GET  /api/v1/auth/oauth/google
+GET  /api/v1/auth/oauth/google/callback
+
+// LinkedIn OAuth
+GET  /api/v1/auth/oauth/linkedin
+GET  /api/v1/auth/oauth/linkedin/callback
+```
+
+**OAuth Flow (Future Implementation):**
+1. User clicks "Login with Google"
+2. Redirect to Google OAuth consent page
+3. User authorizes
+4. Google redirects to callback with code
+5. Exchange code for access token
+6. Get user info from Google
+7. Create/login user in our system
+8. Generate JWT tokens
+
+---
+
+### 📝 Updated Handler Implementation
+
+**What we learned:**
+- Handlers now use service layer instead of placeholders
+- Proper error handling with appropriate HTTP status codes
+- Context extraction for authenticated requests
+
+**Register Handler:**
+```go
+func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+    // Validate request
+    var req dto.RegisterRequest
+    if err := h.validator.ValidateJSON(r, &req); err != nil {
+        respondError(w, http.StatusBadRequest, err.Error(), "VALIDATION_ERROR")
+        return
+    }
+    
+    // Call service
+    authResp, err := h.authService.Register(&req)
+    if err != nil {
+        // Handle errors (user exists, etc.)
+    }
+    
+    respondSuccess(w, http.StatusCreated, authResp, "User registered successfully")
+}
+```
+
+**Me Handler (Protected):**
+```go
+func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
+    // Extract user ID from context (set by auth middleware)
+    userID := r.Context().Value("user_id").(uint)
+    
+    // Get user from service
+    user, err := h.authService.GetUserByID(userID)
+    
+    respondSuccess(w, http.StatusOK, user, "User retrieved successfully")
+}
+```
+
+---
+
+### 🎯 Week 2 Deliverables
+
+✅ **Day 8-9: PostgreSQL + GORM**
+- Database connection setup
+- User model with GORM tags
+- Auto migration on startup
+- Repository pattern implementation
+
+✅ **Day 10-11: Password Hashing & JWT**
+- bcrypt password hashing
+- JWT token generation (access + refresh)
+- JWT token validation
+- Token expiration handling
+
+✅ **Day 12: Auth Middleware**
+- JWT validation middleware
+- Context-based user info passing
+- Protected route implementation
+
+✅ **Day 13-14: OAuth Stubs**
+- Google OAuth endpoints (stubs)
+- LinkedIn OAuth endpoints (stubs)
+- Route registration
+
+---
+
+### 🔄 What's Next (Week 3 - Phase 2)
+
+- User Service implementation
+- MongoDB integration
+- Profile management
+- Skills and portfolio
+- gRPC integration
 
 ---
 
 ### 📖 Key Takeaways
 
-1. **Clean Architecture** makes code maintainable and testable
-2. **Middleware** provides powerful cross-cutting concerns
-3. **Validation** is essential for security and data integrity
-4. **Configuration** should be externalized via environment variables
-5. **Graceful Shutdown** is critical for production applications
-6. **Health Checks** enable proper monitoring and orchestration
+1. **Repository Pattern** abstracts data access and enables testing
+2. **bcrypt** provides secure password hashing with built-in salt
+3. **JWT Tokens** enable stateless authentication
+4. **Service Layer** contains business logic separate from handlers
+5. **Context Values** pass user info from middleware to handlers
+6. **GORM** simplifies database operations with type safety
+7. **Auto Migration** ensures schema consistency across environments
 
 ---
 
-**Document Version:** 1.0  
+**Document Version:** 2.0  
 **Last Updated:** January 24, 2026  
-**Next Update:** After Week 2 completion
+**Next Update:** After Week 3 completion
 

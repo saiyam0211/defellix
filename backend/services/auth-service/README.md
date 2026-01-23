@@ -6,7 +6,98 @@ Authentication microservice for the Decentralized Freelancer Trust Platform.
 
 ### Prerequisites
 - Go 1.24.0 or higher
-- (Optional) Docker for PostgreSQL (Week 2)
+- PostgreSQL database (local, Neon DB, AWS RDS, or Docker)
+
+### Database Options
+
+#### Option 1: Local PostgreSQL (No Docker)
+
+1. **Install PostgreSQL locally:**
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install postgresql postgresql-contrib
+   
+   # macOS (Homebrew)
+   brew install postgresql
+   brew services start postgresql
+   
+   # Create database
+   createdb auth_db
+   ```
+
+2. **Create user and database:**
+   ```bash
+   psql postgres
+   CREATE USER freelancer WITH PASSWORD 'secret';
+   CREATE DATABASE auth_db OWNER freelancer;
+   GRANT ALL PRIVILEGES ON DATABASE auth_db TO freelancer;
+   \q
+   ```
+
+#### Option 2: Neon DB (Serverless PostgreSQL) - Recommended for Development
+
+1. **Sign up at [Neon](https://neon.tech)**
+2. **Create a new project**
+3. **Get connection details from Neon dashboard:**
+   - Host: `ep-xxx-xxx.us-east-2.aws.neon.tech`
+   - Database: `neondb` (default)
+   - User and Password: Provided by Neon
+
+#### Option 3: Docker (Optional)
+
+```bash
+docker-compose up -d
+```
+
+#### Option 4: AWS RDS (Production)
+
+Use RDS PostgreSQL instance connection details.
+
+### Environment Variables
+
+**Create a `.env` file** in the `auth-service` directory (copy from `.env.example`):
+
+```bash
+# Copy example file
+cp .env.example .env
+
+# Edit with your values
+nano .env
+```
+
+**Or set environment variables directly:**
+
+```bash
+# Server Configuration
+export SERVER_HOST=0.0.0.0
+export SERVER_PORT=8080
+
+# Database Configuration
+# For Local PostgreSQL:
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=freelancer
+export DB_PASSWORD=secret
+export DB_NAME=auth_db
+export DB_SSLMODE=disable
+
+# For Neon DB / AWS RDS:
+export DB_HOST=ep-xxx-xxx.us-east-2.aws.neon.tech
+export DB_PORT=5432
+export DB_USER=your-user
+export DB_PASSWORD=your-password
+export DB_NAME=neondb
+export DB_SSLMODE=require  # Required for cloud databases
+
+# JWT Configuration
+export JWT_SECRET=your-secret-key-min-32-characters
+export JWT_ACCESS_TTL_HOURS=24
+export JWT_REFRESH_TTL_DAYS=7
+
+# Application Configuration
+export APP_ENV=development
+export LOG_LEVEL=info
+```
 
 ### Run Locally
 
@@ -17,32 +108,36 @@ cd backend/services/auth-service
 # Install dependencies (if not already done)
 go mod download
 
+# Load environment variables (if using .env file)
+# Note: Go doesn't load .env automatically, use one of:
+# Option A: Use godotenv package (install: go get github.com/joho/godotenv)
+# Option B: Export variables manually
+# Option C: Use a tool like direnv
+
 # Run the server
 go run cmd/server/main.go
 ```
 
 The server will start on `http://localhost:8080` by default.
 
-### Environment Variables
+### Using .env File (Optional)
+
+If you want automatic `.env` file loading, install `godotenv`:
 
 ```bash
-# Server Configuration
-export SERVER_HOST=0.0.0.0
-export SERVER_PORT=8080
-export SERVER_READ_TIMEOUT=15
-export SERVER_WRITE_TIMEOUT=15
-export SERVER_IDLE_TIMEOUT=60
+go get github.com/joho/godotenv
+```
 
-# Application Configuration
-export APP_ENV=development
-export LOG_LEVEL=info
+Then add to `cmd/server/main.go`:
+```go
+import "github.com/joho/godotenv"
 
-# Database Configuration (for Week 2)
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_USER=freelancer
-export DB_PASSWORD=secret
-export DB_NAME=auth_db
+func main() {
+    // Load .env file
+    godotenv.Load()
+    
+    // Rest of the code...
+}
 ```
 
 ## 📁 Project Structure
