@@ -1,6 +1,7 @@
 
 
 import { IoMdTrendingUp } from "react-icons/io";
+import {Link} from "react-router-dom"
 
 
 const Dashboard = () => {
@@ -17,7 +18,7 @@ const Dashboard = () => {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <button className="cursor-pointer bg-teal-600 w-35  hover:bg-teal-700 text-white p-1! rounded-lg font-medium flex items-center gap-2">
+                        <button  className="cursor-pointer bg-teal-600 w-35  hover:bg-teal-700 text-white p-1! rounded-lg font-medium flex items-center gap-2">
                             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2">
                                 <line x1="9" y1="3" x2="9" y2="15" />
                                 <line x1="3" y1="9" x2="15" y2="9" />
@@ -47,11 +48,9 @@ const Dashboard = () => {
 
 
 
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-3xl ml-12! font-bold text-gray-900">100</span>
-                        </div>
+                       
                         <div className="flex justify-center">
-                            <div className="radial-progress text-teal-600 " style={{ "--value": `70`, "--size": "7rem", "--thickness": "10px" } /* as React.CSSProperties */} aria-valuenow={70} role="progressbar">
+                            <div className="radial-progress text-teal-600 " style={{ "--value": `80`, "--size": "7rem", "--thickness": "10px" } /* as React.CSSProperties */} aria-valuenow={70} role="progressbar">
                                 70%
                             </div>
                         </div>
@@ -62,10 +61,10 @@ const Dashboard = () => {
                             <p className="text-md font-medium  text-gray-900">Rising Talent</p>
 
 
-                            <div className="flex justify-center">
-                                <div className="flex items-center gap-1 bg-teal-300 px-2 rounded-xl">
+                            <div className="flex justify-center mt-2">
+                                <div className="flex items-center gap-1 bg-teal-200 px-2 rounded-xl">
                                     <IoMdTrendingUp className="text-teal-700" />
-                                    <p className="text-[8px] text-gray-700">5% growth</p>
+                                    <p className="text-[8px] font-bold  text-gray-700">5% growth</p>
                                 </div>
                             </div>
 
@@ -74,7 +73,7 @@ const Dashboard = () => {
                     </div>
 
 
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6! w-[620px]">
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6! w-[760px]">
 
 
 
@@ -84,11 +83,13 @@ const Dashboard = () => {
 
                 </div>
 
-                <div className="p-6!">
+                <div className="p-6! ml-4">
 
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6!">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-semibold text-gray-900">Recent Contracts</h3>
+                            <h3 className="text-lg font-semibold text-gray-900 ml-5">Recent Contracts</h3>
+                           
+                            <Link to="/myprofile"  className="text-sm font-bold text-white bg-teal-300 px-2 py-1 rounded-2xl mr-4"> View all</Link>
 
                         </div>
 
