@@ -74,7 +74,7 @@ const Dashboard = () => {
                     </div>
 
 
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6! w-[620px]">
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 w-[620px]">
 
 
 
@@ -95,7 +95,7 @@ const Dashboard = () => {
                         <div className="space-y-4!">
 
                             <div className="flex items-start gap-4 p-4! hover:bg-teal-50 rounded-lg cursor-pointer">
-                                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
                                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#3B82F6" strokeWidth="1.5">
                                         <path d="M6 6l-2 4 2 4M14 6l2 4-2 4M12 4l-4 12" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
@@ -116,7 +116,7 @@ const Dashboard = () => {
 
 
                             <div className="flex items-start gap-4 p-4! hover:bg-teal-50 rounded-lg cursor-pointer">
-                                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
                                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#3B82F6" strokeWidth="1.5">
                                         <path d="M6 6l-2 4 2 4M14 6l2 4-2 4M12 4l-4 12" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
