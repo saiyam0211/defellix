@@ -36,6 +36,10 @@ export default function LoginFormDemo() {
           </div>
         </LabelInputContainer>
         
+        <div className="flex gap-2 text-black mb-4">
+          <label htmlFor="checkbox">Remember me</label>
+          <input type="checkbox" name="" id="checkbox" style={{accentColor:"#009689",marginTop:"3px"}} />
+        </div>
  
         <button
           className="group/btn relative block h-10 sm:h-11 md:h-12 w-full rounded-md bg-linear-to-br from-black to-neutral-600 font-medium text-sm sm:text-base text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:bg-teal-800 dark:from-teal-900 dark:to-teal-900 dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset]"
