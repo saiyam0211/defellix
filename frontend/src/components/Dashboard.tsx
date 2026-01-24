@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { IoMdTrendingUp } from "react-icons/io";
 import { useNavigate, Link } from "react-router-dom"
-import CreateModal from "./CreateModal";
+import CreateModal from "./StepperModal";
 
 
 const Dashboard = () => {
