@@ -1,12 +1,16 @@
 import { IoMdTrendingUp } from "react-icons/io";
-import {Link} from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 
 
 const Dashboard = () => {
+    const navigate = useNavigate();
 
+    const handleLoginSignupClick = () => {
+        navigate('/login');
+    };
 
     return (
-        <div className="flex-1 bg-[#fbf9f1] flex flex-col h-screen overflow-y-scroll">
+        <div className="flex-1 bg-[#fbf9f1] flex flex-col h-screen overflow-y-scroll scrBar">
             <header className="bg-[#fbf9f1] px-8 py-9 w-full">
                 <div className="flex justify-between items-center ml-2! mr-7!">
 
@@ -24,9 +28,12 @@ const Dashboard = () => {
                             New Contract
                         </button>
 
-                        <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center">
-                            <span className="text-teal-700 font-medium text-sm">A</span>
-                        </div>
+                        <button 
+                            onClick={handleLoginSignupClick}
+                            className="cursor-pointer bg-teal-600 w-35  hover:bg-teal-700 text-white p-1! rounded-lg font-medium flex justify-center items-center gap-2"
+                        >
+                            Login/SignUp
+                        </button>
                     </div>
                 </div>
             </header>
