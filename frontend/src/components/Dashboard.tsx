@@ -1,5 +1,3 @@
-
-
 import { IoMdTrendingUp } from "react-icons/io";
 import { useNavigate, Link } from "react-router-dom"
 
