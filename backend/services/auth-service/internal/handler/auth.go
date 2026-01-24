@@ -12,15 +12,17 @@ import (
 
 // AuthHandler handles authentication-related endpoints
 type AuthHandler struct {
-	validator  *middleware.Validator
+	validator   *middleware.Validator
 	authService *service.AuthService
+	oauthService *service.OAuthService
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(authService *service.AuthService) *AuthHandler {
+func NewAuthHandler(authService *service.AuthService, oauthService *service.OAuthService) *AuthHandler {
 	return &AuthHandler{
-		validator:  middleware.NewValidator(),
-		authService: authService,
+		validator:    middleware.NewValidator(),
+		authService:  authService,
+		oauthService: oauthService,
 	}
 }
 
@@ -34,11 +36,13 @@ func (h *AuthHandler) RegisterRoutes(r chi.Router, jwtManager *jwt.JWTManager) {
 		// Protected routes
 		r.With(middleware.RequireAuth(jwtManager)).Get("/me", h.Me)
 		
-		// OAuth routes (stubs for Week 2)
+		// OAuth routes
 		r.Get("/oauth/google", h.OAuthGoogle)
 		r.Get("/oauth/google/callback", h.OAuthGoogleCallback)
 		r.Get("/oauth/linkedin", h.OAuthLinkedIn)
 		r.Get("/oauth/linkedin/callback", h.OAuthLinkedInCallback)
+		r.Get("/oauth/github", h.OAuthGitHub)
+		r.Get("/oauth/github/callback", h.OAuthGitHubCallback)
 	})
 }
 
@@ -130,37 +134,144 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	respondSuccess(w, http.StatusOK, user, "User retrieved successfully")
 }
 
-// OAuthGoogle initiates Google OAuth flow (stub)
+// OAuthGoogle initiates Google OAuth flow
 func (h *AuthHandler) OAuthGoogle(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement Google OAuth in future phase
-	respondSuccess(w, http.StatusOK, map[string]string{
-		"message": "Google OAuth - implementation pending",
-		"url":     "/oauth/google/callback",
-	}, "Google OAuth endpoint ready")
+	url, state, err := h.oauthService.GetGoogleAuthURL()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to initiate Google OAuth", "OAUTH_ERROR")
+		return
+	}
+	
+	// Store state in cookie for validation
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   600, // 10 minutes
+	})
+	
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-// OAuthGoogleCallback handles Google OAuth callback (stub)
+// OAuthGoogleCallback handles Google OAuth callback
 func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement Google OAuth callback in future phase
-	respondSuccess(w, http.StatusOK, map[string]string{
-		"message": "Google OAuth callback - implementation pending",
-	}, "Google OAuth callback endpoint ready")
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
+	
+	// Validate state from cookie
+	cookie, err := r.Cookie("oauth_state")
+	if err != nil || cookie.Value != state {
+		respondError(w, http.StatusBadRequest, "Invalid state parameter", "INVALID_STATE")
+		return
+	}
+	
+	authResp, err := h.oauthService.HandleGoogleCallback(r.Context(), code, state)
+	if err != nil {
+		respondError(w, http.StatusUnauthorized, "OAuth authentication failed", "OAUTH_FAILED")
+		return
+	}
+	
+	// Clear state cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    "",
+		MaxAge:   -1,
+	})
+	
+	respondSuccess(w, http.StatusOK, authResp, "Google OAuth authentication successful")
 }
 
-// OAuthLinkedIn initiates LinkedIn OAuth flow (stub)
+// OAuthLinkedIn initiates LinkedIn OAuth flow
 func (h *AuthHandler) OAuthLinkedIn(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement LinkedIn OAuth in future phase
-	respondSuccess(w, http.StatusOK, map[string]string{
-		"message": "LinkedIn OAuth - implementation pending",
-		"url":     "/oauth/linkedin/callback",
-	}, "LinkedIn OAuth endpoint ready")
+	url, state, err := h.oauthService.GetLinkedInAuthURL()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to initiate LinkedIn OAuth", "OAUTH_ERROR")
+		return
+	}
+	
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   600,
+	})
+	
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-// OAuthLinkedInCallback handles LinkedIn OAuth callback (stub)
+// OAuthLinkedInCallback handles LinkedIn OAuth callback
 func (h *AuthHandler) OAuthLinkedInCallback(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement LinkedIn OAuth callback in future phase
-	respondSuccess(w, http.StatusOK, map[string]string{
-		"message": "LinkedIn OAuth callback - implementation pending",
-	}, "LinkedIn OAuth callback endpoint ready")
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
+	
+	cookie, err := r.Cookie("oauth_state")
+	if err != nil || cookie.Value != state {
+		respondError(w, http.StatusBadRequest, "Invalid state parameter", "INVALID_STATE")
+		return
+	}
+	
+	authResp, err := h.oauthService.HandleLinkedInCallback(r.Context(), code, state)
+	if err != nil {
+		respondError(w, http.StatusUnauthorized, "OAuth authentication failed", "OAUTH_FAILED")
+		return
+	}
+	
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    "",
+		MaxAge:   -1,
+	})
+	
+	respondSuccess(w, http.StatusOK, authResp, "LinkedIn OAuth authentication successful")
+}
+
+// OAuthGitHub initiates GitHub OAuth flow
+func (h *AuthHandler) OAuthGitHub(w http.ResponseWriter, r *http.Request) {
+	url, state, err := h.oauthService.GetGitHubAuthURL()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to initiate GitHub OAuth", "OAUTH_ERROR")
+		return
+	}
+	
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   600,
+	})
+	
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+// OAuthGitHubCallback handles GitHub OAuth callback
+func (h *AuthHandler) OAuthGitHubCallback(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
+	
+	cookie, err := r.Cookie("oauth_state")
+	if err != nil || cookie.Value != state {
+		respondError(w, http.StatusBadRequest, "Invalid state parameter", "INVALID_STATE")
+		return
+	}
+	
+	authResp, err := h.oauthService.HandleGitHubCallback(r.Context(), code, state)
+	if err != nil {
+		respondError(w, http.StatusUnauthorized, "OAuth authentication failed", "OAUTH_FAILED")
+		return
+	}
+	
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    "",
+		MaxAge:   -1,
+	})
+	
+	respondSuccess(w, http.StatusOK, authResp, "GitHub OAuth authentication successful")
 }
 

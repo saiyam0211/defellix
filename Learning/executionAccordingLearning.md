@@ -806,7 +806,292 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 
 ---
 
-**Document Version:** 2.0  
+---
+
+## 📚 Phase 2: User Service - MongoDB & Profile Management
+
+**Duration:** Week 3 (Days 15-21)  
+**Goal:** Implement user profile management with MongoDB, skills, and portfolio
+
+---
+
+### 🗄️ MongoDB Integration
+
+#### MongoDB Setup
+
+**What we learned:**
+- MongoDB is a NoSQL document database
+- Perfect for flexible schema (user profiles with varying fields)
+- MongoDB Go driver provides type-safe operations
+- Connection pooling is handled automatically
+
+**Implementation:**
+```go
+// MongoDB connection
+clientOptions := options.Client().ApplyURI(cfg.Database.URI)
+client, err := mongo.Connect(ctx, clientOptions)
+
+// Get database instance
+db := client.Database(cfg.Database.Database)
+```
+
+**Key Concepts:**
+- **Connection URI:** `mongodb://localhost:27017` or `mongodb+srv://` for Atlas
+- **Database:** Logical grouping of collections
+- **Collections:** Equivalent to tables in SQL
+- **Documents:** JSON-like BSON documents
+
+**Why MongoDB for User Service?**
+- Flexible schema for varying profile structures
+- Easy to add new fields without migrations
+- Good for nested data (portfolio items, skills arrays)
+- Scales horizontally
+- JSON-like structure matches API responses
+
+---
+
+### 📄 Document Model Design
+
+**What we learned:**
+- BSON tags map Go structs to MongoDB documents
+- `primitive.ObjectID` for MongoDB document IDs
+- Embedded documents for nested structures
+- Arrays for skills and portfolio items
+
+**User Profile Model:**
+```go
+type UserProfile struct {
+    ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+    UserID      uint               `bson:"user_id" json:"user_id"`
+    FullName    string             `bson:"full_name" json:"full_name"`
+    Skills      []string           `bson:"skills,omitempty" json:"skills,omitempty"`
+    Portfolio   []PortfolioItem    `bson:"portfolio,omitempty" json:"portfolio,omitempty"`
+    // ...
+}
+```
+
+**Key Features:**
+- **ObjectID:** MongoDB's unique identifier
+- **Embedded Documents:** Portfolio items stored as array
+- **Flexible Fields:** Optional fields with `omitempty`
+- **BSON Tags:** Control how data is stored in MongoDB
+
+---
+
+### 🔍 Repository Pattern with MongoDB
+
+**What we learned:**
+- MongoDB operations use context for cancellation
+- Query filters use BSON maps
+- Update operations use `$set`, `$push`, `$pull` operators
+- Pagination with `Skip` and `Limit`
+
+**Search Implementation:**
+```go
+// Build filter
+filter := bson.M{
+    "is_active": true,
+    "role": "freelancer",
+    "skills": bson.M{"$in": []string{"Go", "Python"}},
+}
+
+// Pagination
+opts := options.Find().SetSkip(skip).SetLimit(limit)
+
+// Execute query
+cursor, err := collection.Find(ctx, filter, opts)
+```
+
+**Array Operations:**
+```go
+// Add skill
+update := bson.M{
+    "$addToSet": bson.M{"skills": skill},
+    "$set":      bson.M{"updated_at": time.Now()},
+}
+
+// Remove skill
+update := bson.M{
+    "$pull": bson.M{"skills": skill},
+}
+```
+
+**Key MongoDB Operators:**
+- `$in`: Match any value in array
+- `$regex`: Text search with regex
+- `$gte`, `$lte`: Range queries
+- `$addToSet`: Add to array if not exists
+- `$pull`: Remove from array
+- `$push`: Add to array
+
+---
+
+### 🔎 Advanced Search Functionality
+
+**What we learned:**
+- Multi-criteria search with flexible filters
+- Text search across multiple fields
+- Pagination for large result sets
+- Filter combination with BSON maps
+
+**Search Features:**
+- **Text Search:** Name, bio, skills
+- **Role Filter:** Freelancer, client, both
+- **Skills Filter:** Match any skill in array
+- **Rate Range:** Min/max hourly rate
+- **Location:** Regex-based location search
+- **Availability:** Filter by availability status
+
+**Implementation:**
+```go
+// Build dynamic filter
+filter := bson.M{"is_active": true}
+
+if req.Role != "" {
+    filter["role"] = req.Role
+}
+
+if len(req.Skills) > 0 {
+    filter["skills"] = bson.M{"$in": req.Skills}
+}
+
+// Text search across multiple fields
+if req.Query != "" {
+    filter["$or"] = []bson.M{
+        {"full_name": bson.M{"$regex": req.Query, "$options": "i"}},
+        {"bio": bson.M{"$regex": req.Query, "$options": "i"}},
+    }
+}
+```
+
+---
+
+### 🎨 Skills & Portfolio Management
+
+**What we learned:**
+- Array operations in MongoDB
+- Nested document updates
+- Positional operators for array updates
+
+**Skills Management:**
+- Add skill: `$addToSet` prevents duplicates
+- Remove skill: `$pull` removes from array
+- Skills stored as string array
+
+**Portfolio Management:**
+- Portfolio items as embedded documents
+- Each item has its own ObjectID
+- Update specific item using positional operator `$`
+
+**Portfolio Update:**
+```go
+filter := bson.M{
+    "user_id": userID,
+    "portfolio._id": itemID,
+}
+
+update := bson.M{
+    "$set": bson.M{
+        "portfolio.$.title": item.Title,
+        "portfolio.$.description": item.Description,
+    },
+}
+```
+
+---
+
+### 🛡️ Authentication Middleware (Placeholder)
+
+**What we learned:**
+- Middleware extracts user info from JWT token
+- Context values pass user ID to handlers
+- Protected routes require authentication
+
+**Current Implementation:**
+- Placeholder authentication (extracts user_id from context)
+- In production, will validate JWT with auth-service via gRPC
+- Context-based user identification
+
+**Future Enhancement:**
+- gRPC call to auth-service for token validation
+- Cache validated tokens
+- Role-based access control
+
+---
+
+### 📊 Service Layer Patterns
+
+**What we learned:**
+- Service layer coordinates repository operations
+- Business logic separate from data access
+- DTO conversion for API responses
+- Error handling and validation
+
+**Service Methods:**
+- `GetProfile`: Retrieve by ID or user ID
+- `UpdateProfile`: Create or update profile
+- `SearchProfiles`: Multi-criteria search
+- `AddSkill`/`RemoveSkill`: Array operations
+- `AddPortfolioItem`/`UpdatePortfolioItem`/`DeletePortfolioItem`: Portfolio management
+
+**DTO Conversion:**
+- Domain models → DTOs for API responses
+- Handle ObjectID to string conversion
+- Format timestamps as ISO 8601
+- Filter sensitive data
+
+---
+
+### 🎯 Phase 2 Deliverables
+
+✅ **Day 15-16: MongoDB Setup**
+- MongoDB connection and configuration
+- Database initialization
+- Collection setup
+
+✅ **Day 17-18: Profile CRUD**
+- Create user profile
+- Get profile by ID/user ID
+- Update profile
+- Search profiles
+
+✅ **Day 19-20: Skills & Portfolio**
+- Add/remove skills
+- Add portfolio items
+- Update portfolio items
+- Delete portfolio items
+
+✅ **Day 21: gRPC Integration (Pending)**
+- gRPC client setup
+- Auth service integration
+- Token validation
+
+---
+
+### 🔄 What's Next (Phase 3)
+
+- Contract Service implementation
+- Contract lifecycle management
+- Digital signatures
+- Milestone tracking
+- IPFS integration
+
+---
+
+### 📖 Key Takeaways
+
+1. **MongoDB** provides flexible schema for varying data structures
+2. **BSON** maps Go structs to MongoDB documents
+3. **Array Operations** (`$addToSet`, `$pull`) simplify skills/portfolio management
+4. **Search Filters** can be built dynamically with BSON maps
+5. **Pagination** is essential for large result sets
+6. **Embedded Documents** store nested data efficiently
+7. **Repository Pattern** abstracts MongoDB operations
+8. **Service Layer** contains business logic separate from data access
+
+---
+
+**Document Version:** 3.0  
 **Last Updated:** January 24, 2026  
-**Next Update:** After Week 3 completion
+**Next Update:** After Phase 3 completion
 

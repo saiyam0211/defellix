@@ -28,8 +28,8 @@ brew services start postgresql  # macOS
 # Create database and user
 sudo -u postgres psql
 CREATE USER freelancer WITH PASSWORD 'secret';
-CREATE DATABASE auth_db OWNER freelancer;
-GRANT ALL PRIVILEGES ON DATABASE auth_db TO freelancer;
+CREATE DATABASE freelancer_platform OWNER freelancer;  # Shared database!
+GRANT ALL PRIVILEGES ON DATABASE freelancer_platform TO freelancer;
 \q
 ```
 
@@ -39,7 +39,7 @@ export DB_HOST=localhost
 export DB_PORT=5432
 export DB_USER=freelancer
 export DB_PASSWORD=secret
-export DB_NAME=auth_db
+export DB_NAME=freelancer_platform  # Shared with User Service!
 export DB_SSLMODE=disable
 ```
 
@@ -69,13 +69,13 @@ export DB_HOST=ep-xxx-xxx.us-east-2.aws.neon.tech
 export DB_PORT=5432
 export DB_USER=your-neon-user
 export DB_PASSWORD=your-neon-password
-export DB_NAME=neondb  # or your custom database name
+export DB_NAME=freelancer_platform  # Shared with User Service!
 export DB_SSLMODE=require  # IMPORTANT: Required for Neon
 ```
 
 **Connection String Format:**
 ```
-postgresql://user:password@ep-xxx-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+postgresql://user:password@ep-xxx-xxx.us-east-2.aws.neon.tech/freelancer_platform?sslmode=require
 ```
 
 ---
@@ -94,7 +94,7 @@ postgresql://user:password@ep-xxx-xxx.us-east-2.aws.neon.tech/neondb?sslmode=req
 2. **Get Connection Details:**
    - Endpoint: `your-db.region.rds.amazonaws.com`
    - Port: `5432`
-   - Database name: `auth_db`
+   - Database name: `freelancer_platform` (shared with User Service)
    - Username and password from setup
 
 **Environment Variables:**
@@ -103,7 +103,7 @@ export DB_HOST=your-db.region.rds.amazonaws.com
 export DB_PORT=5432
 export DB_USER=your-rds-username
 export DB_PASSWORD=your-rds-password
-export DB_NAME=auth_db
+export DB_NAME=freelancer_platform  # Shared with User Service!
 export DB_SSLMODE=require  # Recommended for RDS
 ```
 
@@ -123,7 +123,7 @@ export DB_HOST=localhost
 export DB_PORT=5432
 export DB_USER=freelancer
 export DB_PASSWORD=secret
-export DB_NAME=auth_db
+export DB_NAME=freelancer_platform  # Shared with User Service!
 export DB_SSLMODE=disable
 ```
 
@@ -152,7 +152,7 @@ export DB_SSLMODE=disable
    DB_PORT=5432
    DB_USER=your-user
    DB_PASSWORD=your-password
-   DB_NAME=your-database
+   DB_NAME=freelancer_platform  # Shared with User Service!
    DB_SSLMODE=require
    JWT_SECRET=your-secret-key-min-32-characters
    ```
@@ -185,7 +185,7 @@ export DB_HOST=localhost
 export DB_PORT=5432
 export DB_USER=freelancer
 export DB_PASSWORD=secret
-export DB_NAME=auth_db
+export DB_NAME=freelancer_platform  # Shared with User Service!
 export DB_SSLMODE=disable
 export JWT_SECRET=your-secret-key-min-32-characters
 ```
@@ -196,7 +196,7 @@ $env:DB_HOST="localhost"
 $env:DB_PORT="5432"
 $env:DB_USER="freelancer"
 $env:DB_PASSWORD="secret"
-$env:DB_NAME="auth_db"
+$env:DB_NAME="freelancer_platform"  # Shared with User Service!
 $env:DB_SSLMODE="disable"
 $env:JWT_SECRET="your-secret-key-min-32-characters"
 ```
@@ -207,7 +207,7 @@ set DB_HOST=localhost
 set DB_PORT=5432
 set DB_USER=freelancer
 set DB_PASSWORD=secret
-set DB_NAME=auth_db
+set DB_NAME=freelancer_platform  # Shared with User Service!
 set DB_SSLMODE=disable
 set JWT_SECRET=your-secret-key-min-32-characters
 ```
@@ -280,11 +280,13 @@ go run cmd/server/main.go
 **Test Database Connection:**
 ```bash
 # Using psql
-psql -h localhost -U freelancer -d auth_db
+psql -h localhost -U freelancer -d freelancer_platform
 
 # Or test from Go service
 # The service will log connection errors on startup
 ```
+
+**Note:** This database is shared with User Service. Both services will create their tables in the same database.
 
 **Test Service:**
 ```bash
@@ -333,7 +335,7 @@ curl http://localhost:8080/health
 - `DB_PORT` - Database port (default: 5432)
 - `DB_USER` - Database username
 - `DB_PASSWORD` - Database password
-- `DB_NAME` - Database name
+- `DB_NAME` - Database name: `freelancer_platform` (shared with User Service!)
 - `DB_SSLMODE` - SSL mode (disable for local, require for cloud)
 - `JWT_SECRET` - Secret key for JWT tokens (min 32 characters)
 
