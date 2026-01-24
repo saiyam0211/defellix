@@ -1,0 +1,79 @@
+package config
+
+import (
+	"fmt"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+)
+
+// InitDB initializes and returns a PostgreSQL database connection
+func InitDB(cfg *Config) (*gorm.DB, error) {
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=UTC",
+		cfg.Database.Host,
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.DBName,
+		cfg.Database.Port,
+		cfg.Database.SSLMode,
+	)
+
+	// Set log level based on environment
+	logLevel := logger.Silent
+	if cfg.App.Environment == "development" {
+		logLevel = logger.Info
+	}
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logLevel),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	return db, nil
+}
+
+// AutoMigrate runs database migrations for all domain models
+func AutoMigrate(db *gorm.DB, models ...interface{}) error {
+	if err := db.AutoMigrate(models...); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+	return nil
+}
+
+// CreateIndexes creates additional indexes for performance
+func CreateIndexes(db *gorm.DB) error {
+	// Text search index (using GIN index for JSONB)
+	if err := db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_user_profiles_skills_gin 
+		ON user_profiles USING GIN (skills);
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create skills index: %w", err)
+	}
+
+	if err := db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_user_profiles_projects_gin 
+		ON user_profiles USING GIN (projects);
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create projects index: %w", err)
+	}
+
+	// Full-text search index
+	if err := db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_user_profiles_fulltext 
+		ON user_profiles USING GIN (
+			to_tsvector('english', 
+				COALESCE(full_name, '') || ' ' || 
+				COALESCE(short_headline, '') || ' ' || 
+				COALESCE(bio, '')
+			)
+		);
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create fulltext index: %w", err)
+	}
+
+	return nil
+}

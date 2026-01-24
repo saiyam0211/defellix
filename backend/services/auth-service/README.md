@@ -43,13 +43,7 @@ Authentication microservice for the Decentralized Freelancer Trust Platform.
    - Database: `neondb` (default)
    - User and Password: Provided by Neon
 
-#### Option 3: Docker (Optional)
-
-```bash
-docker-compose up -d
-```
-
-#### Option 4: AWS RDS (Production)
+#### Option 3: AWS RDS (Production)
 
 Use RDS PostgreSQL instance connection details.
 

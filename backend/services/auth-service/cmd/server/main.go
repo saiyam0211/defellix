@@ -36,7 +36,7 @@ func main() {
 	}
 
 	// Run migrations
-	if err := config.AutoMigrate(db, &domain.User{}); err != nil {
+	if err := config.AutoMigrate(db, &domain.User{}, &domain.OAuthProvider{}); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 	log.Println("Database migrations completed")
@@ -48,11 +48,19 @@ func main() {
 		time.Duration(cfg.JWT.RefreshTokenTTL)*24*time.Hour,
 	)
 
-	// Initialize repository
+	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
+	oauthRepo := repository.NewOAuthRepository(db)
 
-	// Initialize service
+	// Initialize services
 	authService := service.NewAuthService(userRepo, jwtManager)
+	
+	// Initialize OAuth service
+	encryptionKey := os.Getenv("OAUTH_ENCRYPTION_KEY")
+	if encryptionKey == "" {
+		encryptionKey = cfg.JWT.SecretKey // Fallback to JWT secret
+	}
+	oauthService := service.NewOAuthService(userRepo, oauthRepo, jwtManager, cfg.OAuth, encryptionKey)
 
 	// Create router
 	r := chi.NewRouter()
@@ -61,7 +69,7 @@ func main() {
 	setupMiddleware(r)
 
 	// Setup routes
-	setupRoutes(r, authService, jwtManager)
+	setupRoutes(r, authService, oauthService, jwtManager)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -121,12 +129,12 @@ func setupMiddleware(r *chi.Mux) {
 }
 
 // setupRoutes configures all application routes
-func setupRoutes(r *chi.Mux, authService *service.AuthService, jwtManager *jwt.JWTManager) {
+func setupRoutes(r *chi.Mux, authService *service.AuthService, oauthService *service.OAuthService, jwtManager *jwt.JWTManager) {
 	// Health check handler
 	healthHandler := handler.NewHealthHandler()
 	healthHandler.RegisterRoutes(r)
 
 	// Auth handler
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(authService, oauthService)
 	authHandler.RegisterRoutes(r, jwtManager)
 }

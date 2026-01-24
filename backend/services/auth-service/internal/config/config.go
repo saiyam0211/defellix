@@ -11,6 +11,7 @@ type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
 	JWT      JWTConfig
+	OAuth    *OAuthConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -72,6 +73,7 @@ func Load() *Config {
 			AccessTokenTTL:  getEnvAsInt("JWT_ACCESS_TTL_HOURS", 24),
 			RefreshTokenTTL: getEnvAsInt("JWT_REFRESH_TTL_DAYS", 7),
 		},
+		OAuth: LoadOAuthConfig(),
 	}
 }
 

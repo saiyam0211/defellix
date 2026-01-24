@@ -1080,7 +1080,592 @@ chmod +x test_week2.sh
 
 ---
 
-**Document Version:** 2.0  
+---
+
+## 🧪 Phase 2: User Service - MongoDB & Profile Management Tests
+
+**Goal:** Verify that MongoDB integration, profile CRUD, search, skills, and portfolio management are working correctly.
+
+---
+
+### 📋 Prerequisites
+
+1. **Start MongoDB:**
+   ```bash
+   # Option 1: Docker
+   cd backend/services/user-service
+   docker-compose up -d
+
+   # Option 2: Local MongoDB
+   # Ensure MongoDB is running on localhost:27017
+   ```
+
+2. **Set Environment Variables:**
+   ```bash
+   export MONGO_URI=mongodb://localhost:27017
+   export MONGO_DB=user_db
+   export SERVER_PORT=8081
+   ```
+
+3. **Start the User Service:**
+   ```bash
+   cd backend/services/user-service
+   go run cmd/server/main.go
+   ```
+
+---
+
+### ✅ Test Cases
+
+#### 1. Health Check Tests
+
+**Test P2.1: Basic Health Check**
+```bash
+curl http://localhost:8081/health
+```
+
+**Expected Response:**
+```json
+{
+    "status": "healthy",
+    "timestamp": "2026-01-24T10:30:00Z",
+    "service": "user-service",
+    "version": "1.0.0"
+}
+```
+
+**Status Code:** `200 OK`
+
+---
+
+#### 2. Profile Management Tests
+
+**Test P2.2: Update My Profile (Create Profile)**
+```bash
+curl -X PUT http://localhost:8081/api/v1/users/me \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "full_name": "John Doe",
+    "bio": "Experienced Go developer",
+    "location": "Mumbai, India",
+    "hourly_rate": 25.50,
+    "availability": "available"
+  }'
+```
+
+**Expected Response:**
+```json
+{
+    "data": {
+        "id": "...",
+        "user_id": 1,
+        "full_name": "John Doe",
+        "bio": "Experienced Go developer",
+        "location": "Mumbai, India",
+        "hourly_rate": 25.50,
+        "availability": "available",
+        "is_active": true
+    },
+    "message": "Profile updated successfully"
+}
+```
+
+**Status Code:** `200 OK`
+
+---
+
+**Test P2.3: Get My Profile**
+```bash
+curl http://localhost:8081/api/v1/users/me \
+  -H "Authorization: Bearer <token>"
+```
+
+**Expected Response:**
+```json
+{
+    "data": {
+        "id": "...",
+        "user_id": 1,
+        "full_name": "John Doe",
+        "bio": "Experienced Go developer",
+        ...
+    },
+    "message": "Profile retrieved successfully"
+}
+```
+
+**Status Code:** `200 OK`
+
+---
+
+**Test P2.4: Get Profile by ID**
+```bash
+# Use the ID from previous response
+curl http://localhost:8081/api/v1/users/{profile_id}
+```
+
+**Expected Response:**
+```json
+{
+    "data": {
+        "id": "...",
+        "user_id": 1,
+        "full_name": "John Doe",
+        ...
+    },
+    "message": "Profile retrieved successfully"
+}
+```
+
+**Status Code:** `200 OK`
+
+---
+
+**Test P2.5: Update Profile (Partial Update)**
+```bash
+curl -X PUT http://localhost:8081/api/v1/users/me \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bio": "Updated bio text",
+    "hourly_rate": 30.00
+  }'
+```
+
+**Expected Response:**
+```json
+{
+    "data": {
+        "bio": "Updated bio text",
+        "hourly_rate": 30.00,
+        ...
+    },
+    "message": "Profile updated successfully"
+}
+```
+
+**Status Code:** `200 OK`
+
+---
+
+#### 3. Skills Management Tests
+
+**Test P2.6: Add Skill**
+```bash
+curl -X POST http://localhost:8081/api/v1/users/me/skills \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "skill": "Go"
+  }'
+```
+
+**Expected Response:**
+```json
+{
+    "data": {
+        "message": "Skill added successfully"
+    },
+    "message": "Skill added"
+}
+```
+
+**Status Code:** `200 OK`
+
+---
+
+**Test P2.7: Add Multiple Skills**
+```bash
+curl -X POST http://localhost:8081/api/v1/users/me/skills \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"skill": "Python"}'
+
+curl -X POST http://localhost:8081/api/v1/users/me/skills \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"skill": "JavaScript"}'
+```
+
+**Verify:** Get profile and check skills array contains all added skills.
+
+---
+
+**Test P2.8: Remove Skill**
+```bash
+curl -X DELETE http://localhost:8081/api/v1/users/me/skills \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "skill": "Python"
+  }'
+```
+
+**Expected Response:**
+```json
+{
+    "data": {
+        "message": "Skill removed successfully"
+    },
+    "message": "Skill removed"
+}
+```
+
+**Status Code:** `200 OK`
+
+---
+
+#### 4. Portfolio Management Tests
+
+**Test P2.9: Add Portfolio Item**
+```bash
+curl -X POST http://localhost:8081/api/v1/users/me/portfolio \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "E-commerce Platform",
+    "description": "Built a full-stack e-commerce platform using Go and React",
+    "url": "https://example.com/project",
+    "image_url": "https://example.com/image.png",
+    "technologies": ["Go", "React", "PostgreSQL"]
+  }'
+```
+
+**Expected Response:**
+```json
+{
+    "data": {
+        "id": "...",
+        "title": "E-commerce Platform",
+        "description": "Built a full-stack e-commerce platform...",
+        "url": "https://example.com/project",
+        "image_url": "https://example.com/image.png",
+        "technologies": ["Go", "React", "PostgreSQL"],
+        "created_at": "2026-01-24T10:30:00Z"
+    },
+    "message": "Portfolio item added successfully"
+}
+```
+
+**Status Code:** `201 Created`
+
+---
+
+**Test P2.10: Update Portfolio Item**
+```bash
+# Use item ID from previous response
+curl -X PUT http://localhost:8081/api/v1/users/me/portfolio/{item_id} \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Updated E-commerce Platform",
+    "description": "Updated description"
+  }'
+```
+
+**Expected Response:**
+```json
+{
+    "data": {
+        "id": "...",
+        "title": "Updated E-commerce Platform",
+        ...
+    },
+    "message": "Portfolio item updated successfully"
+}
+```
+
+**Status Code:** `200 OK`
+
+---
+
+**Test P2.11: Delete Portfolio Item**
+```bash
+curl -X DELETE http://localhost:8081/api/v1/users/me/portfolio/{item_id} \
+  -H "Authorization: Bearer <token>"
+```
+
+**Expected Response:**
+```json
+{
+    "data": {
+        "message": "Portfolio item deleted successfully"
+    },
+    "message": "Portfolio item deleted"
+}
+```
+
+**Status Code:** `200 OK`
+
+---
+
+#### 5. Search Tests
+
+**Test P2.12: Search by Query**
+```bash
+curl -X POST http://localhost:8081/api/v1/users/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Go developer",
+    "role": "freelancer"
+  }'
+```
+
+**Expected Response:**
+```json
+{
+    "data": {
+        "users": [
+            {
+                "id": "...",
+                "full_name": "John Doe",
+                "bio": "Experienced Go developer",
+                "skills": ["Go", "JavaScript"],
+                ...
+            }
+        ],
+        "total": 1,
+        "page": 1,
+        "limit": 20,
+        "total_pages": 1
+    },
+    "message": "Search completed successfully"
+}
+```
+
+**Status Code:** `200 OK`
+
+---
+
+**Test P2.13: Search by Skills**
+```bash
+curl -X POST http://localhost:8081/api/v1/users/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "skills": ["Go", "Python"],
+    "role": "freelancer"
+  }'
+```
+
+**Expected Response:** Users with Go OR Python skills
+
+---
+
+**Test P2.14: Search with Rate Range**
+```bash
+curl -X POST http://localhost:8081/api/v1/users/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "min_rate": 20.00,
+    "max_rate": 50.00,
+    "role": "freelancer"
+  }'
+```
+
+**Expected Response:** Freelancers with hourly rate between $20-$50
+
+---
+
+**Test P2.15: Search with Pagination**
+```bash
+curl -X POST http://localhost:8081/api/v1/users/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role": "freelancer",
+    "page": 2,
+    "limit": 10
+  }'
+```
+
+**Expected Response:**
+```json
+{
+    "data": {
+        "users": [...],
+        "total": 25,
+        "page": 2,
+        "limit": 10,
+        "total_pages": 3
+    }
+}
+```
+
+---
+
+**Test P2.16: Search with Query Parameters**
+```bash
+curl "http://localhost:8081/api/v1/users/search?query=developer&role=freelancer&page=1&limit=20"
+```
+
+**Expected Response:** Same as JSON body search
+
+---
+
+#### 6. Error Handling Tests
+
+**Test P2.17: Get Non-existent Profile**
+```bash
+curl http://localhost:8081/api/v1/users/nonexistent_id
+```
+
+**Expected Response:**
+```json
+{
+    "error": "Not Found",
+    "message": "User profile not found",
+    "code": "PROFILE_NOT_FOUND"
+}
+```
+
+**Status Code:** `404 Not Found`
+
+---
+
+**Test P2.18: Update Profile Without Auth**
+```bash
+curl -X PUT http://localhost:8081/api/v1/users/me \
+  -H "Content-Type: application/json" \
+  -d '{"full_name": "Test"}'
+```
+
+**Expected Response:**
+```json
+{
+    "error": "Unauthorized",
+    "message": "Authorization header required",
+    "code": "UNAUTHORIZED"
+}
+```
+
+**Status Code:** `401 Unauthorized`
+
+---
+
+**Test P2.19: Invalid Portfolio Item ID**
+```bash
+curl -X PUT http://localhost:8081/api/v1/users/me/portfolio/invalid_id \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Test"}'
+```
+
+**Expected Response:**
+```json
+{
+    "error": "Not Found",
+    "message": "Portfolio item not found",
+    "code": "ITEM_NOT_FOUND"
+}
+```
+
+**Status Code:** `404 Not Found`
+
+---
+
+### 🎯 Phase 2 Completion Checklist
+
+- [ ] MongoDB is running and accessible
+- [ ] User profile can be created
+- [ ] Profile can be retrieved by ID and user ID
+- [ ] Profile can be updated
+- [ ] Skills can be added and removed
+- [ ] Portfolio items can be added, updated, and deleted
+- [ ] Search functionality works with various filters
+- [ ] Pagination works correctly
+- [ ] Protected routes require authentication
+- [ ] Error handling returns appropriate status codes
+- [ ] Validation works for all endpoints
+
+---
+
+### 🚀 Quick Test Script for Phase 2
+
+Save this as `test_phase2.sh`:
+
+```bash
+#!/bin/bash
+
+BASE_URL="http://localhost:8081"
+TOKEN="your-jwt-token-here"
+
+echo "=== Phase 2 Tests ==="
+echo ""
+
+echo "1. Testing Health Check..."
+curl -s $BASE_URL/health | jq .
+echo ""
+
+echo "2. Testing Profile Update..."
+curl -s -X PUT $BASE_URL/api/v1/users/me \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"full_name":"Test User","bio":"Test bio"}' | jq .
+echo ""
+
+echo "3. Testing Add Skill..."
+curl -s -X POST $BASE_URL/api/v1/users/me/skills \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"skill":"Go"}' | jq .
+echo ""
+
+echo "4. Testing Search..."
+curl -s -X POST $BASE_URL/api/v1/users/search \
+  -H "Content-Type: application/json" \
+  -d '{"role":"freelancer","limit":5}' | jq .
+echo ""
+
+echo "All Phase 2 tests completed!"
+```
+
+**Run with:**
+```bash
+chmod +x test_phase2.sh
+./test_phase2.sh
+```
+
+---
+
+### 📊 Expected Test Results Summary
+
+| Test Category | Tests | Passed | Failed |
+|--------------|-------|--------|--------|
+| Health Checks | 1 | ✅ | ❌ |
+| Profile CRUD | 4 | ✅ | ❌ |
+| Skills Management | 3 | ✅ | ❌ |
+| Portfolio Management | 3 | ✅ | ❌ |
+| Search | 5 | ✅ | ❌ |
+| Error Handling | 3 | ✅ | ❌ |
+| **Total** | **19** | **✅** | **❌** |
+
+---
+
+### 🔍 Debugging Tips
+
+1. **MongoDB Connection Issues?**
+   - Verify MongoDB is running: `docker ps | grep mongo`
+   - Check connection string format
+   - Verify authentication credentials
+
+2. **Profile Not Found?**
+   - Ensure profile exists for the user
+   - Check user_id matches auth-service user ID
+   - Verify MongoDB collection has data
+
+3. **Search Not Working?**
+   - Check filter syntax
+   - Verify data exists matching search criteria
+   - Test individual filters separately
+
+4. **Array Operations Failing?**
+   - Verify user profile exists before adding skills/portfolio
+   - Check skill/item doesn't already exist
+   - Verify ObjectID format for updates
+
+---
+
+**Document Version:** 3.0  
 **Last Updated:** January 24, 2026  
-**Next Update:** After Week 3 completion
+**Next Update:** After Phase 3 completion
 
