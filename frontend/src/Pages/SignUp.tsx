@@ -8,6 +8,7 @@ import {
     IconBrandGoogle,
 
 } from "@tabler/icons-react";
+import { FaLinkedin } from "react-icons/fa6";
 
 export default function SignUp() {
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -22,12 +23,12 @@ export default function SignUp() {
                     SignUp
                 </h2>
                 <form className="my-4 sm:my-6 md:my-8" onSubmit={handleSubmit}>
-                    <div className="mb-3 sm:mb-4 flex flex-col space-y-2 sm:space-y-3 md:flex-row md:space-y-0 md:space-x-2 lg:space-x-3">
+                    <div className="mb-3 sm:mb-4  flex flex-col space-y-2 sm:space-y-3 md:flex-row md:space-y-0 md:space-x-2 lg:space-x-3">
                         <LabelInputContainer>
-                            <Label htmlFor="firstname" className="text-black text-sm sm:text-base">First name</Label>
+                            <Label htmlFor="firstname" className="text-black  text-sm sm:text-base">First name</Label>
                             <div className="relative group overflow-hidden rounded-md">
                                 <div className="absolute inset-0 rounded-md bg-teal-600 opacity-0 group-hover:opacity-30 group-hover:scale-105 transition-all duration-500 ease-out pointer-events-none"></div>
-                                <Input id="firstname" placeholder="Tyler" type="text" className="relative z-10 border border-black text-black hover:border-teal-500 transition-all duration-300 text-sm sm:text-base h-9 sm:h-10 md:h-11" />
+                                <Input id="firstname" placeholder="Tyler" type="text" className="relative z-10 text-black hover:border-teal-500 transition-all duration-300 text-sm sm:text-base h-9 sm:h-10 md:h-11" />
                             </div>
                         </LabelInputContainer>
                         <LabelInputContainer className="text-black">
@@ -82,6 +83,16 @@ export default function SignUp() {
                             <IconBrandGoogle className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-800 dark:text-neutral-300" />
                             <span className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300">
                                 Google
+                            </span>
+                            <BottomGradient />
+                        </button>
+                        <button
+                            className="group/btn shadow-input relative flex h-10 sm:h-11 md:h-12 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-3 sm:px-4 font-medium text-xs sm:text-sm text-black dark:bg-teal-900 dark:shadow-[0px_0px_1px_1px_#262626]"
+                            type="submit"
+                        >
+                            <FaLinkedin className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-800 dark:text-neutral-300" />
+                            <span className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300">
+                                Linkedin
                             </span>
                             <BottomGradient />
                         </button>
