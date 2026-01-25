@@ -3,10 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/saiyam0211/defellix/services/contract-service/internal/domain"
 	"github.com/saiyam0211/defellix/services/contract-service/internal/dto"
+	"github.com/saiyam0211/defellix/services/contract-service/internal/notification"
 	"github.com/saiyam0211/defellix/services/contract-service/internal/repository"
 )
 
@@ -16,11 +19,24 @@ var (
 )
 
 type ContractService struct {
-	repo repository.ContractRepository
+	repo                 repository.ContractRepository
+	shareableLinkBaseURL string
+	notifier             notification.ContractNotifier
+	draftExpiryDays      int
 }
 
-func NewContractService(repo repository.ContractRepository) *ContractService {
-	return &ContractService{repo: repo}
+// NewContractService creates the contract service. shareableLinkBaseURL is used for shareable_link when status is sent (e.g. https://app.ourdomain.com/contract).
+// draftExpiryDays is used by DeleteExpiredDrafts; if <= 0, 14 is used.
+func NewContractService(repo repository.ContractRepository, shareableLinkBaseURL string, notifier notification.ContractNotifier, draftExpiryDays int) *ContractService {
+	if draftExpiryDays <= 0 {
+		draftExpiryDays = 14
+	}
+	return &ContractService{
+		repo:                 repo,
+		shareableLinkBaseURL: strings.TrimSuffix(shareableLinkBaseURL, "/"),
+		notifier:             notifier,
+		draftExpiryDays:      draftExpiryDays,
+	}
 }
 
 func (s *ContractService) Create(ctx context.Context, freelancerUserID uint, req *dto.CreateContractRequest) (*dto.ContractResponse, error) {
@@ -118,7 +134,10 @@ func (s *ContractService) Send(ctx context.Context, id uint, freelancerUserID ui
 	}
 	c.Status = domain.ContractStatusSent
 	c.SentAt = &now
-	return s.contractToResponse(c), nil
+	shareableLink := s.buildShareableLink(id)
+	// Trigger “email to client” off the hot path; do not block response
+	go s.notifier.NotifyContractSent(context.Background(), id, c.ClientEmail, shareableLink)
+	return s.toResponseWithShareable(c, c.Milestones, shareableLink), nil
 }
 
 func (s *ContractService) Delete(ctx context.Context, id uint, freelancerUserID uint) error {
@@ -130,6 +149,20 @@ func (s *ContractService) Delete(ctx context.Context, id uint, freelancerUserID 
 		return ErrNotDraft
 	}
 	return s.repo.Delete(ctx, id, freelancerUserID)
+}
+
+// DeleteExpiredDrafts permanently deletes draft contracts older than draftExpiryDays. Returns the number deleted.
+// Used by the scheduled draft-cleanup job.
+func (s *ContractService) DeleteExpiredDrafts(ctx context.Context) (int64, error) {
+	cutoff := time.Now().Add(-time.Duration(s.draftExpiryDays) * 24 * time.Hour)
+	return s.repo.DeleteDraftsOlderThan(ctx, cutoff)
+}
+
+func (s *ContractService) buildShareableLink(contractID uint) string {
+	if s.shareableLinkBaseURL == "" {
+		return ""
+	}
+	return s.shareableLinkBaseURL + "/" + strconv.FormatUint(uint64(contractID), 10)
 }
 
 func milestonesFromInput(in []dto.MilestoneInput) []domain.ContractMilestone {
@@ -190,6 +223,14 @@ func applyUpdate(c *domain.Contract, req *dto.UpdateContractRequest) {
 }
 
 func (s *ContractService) toResponse(c *domain.Contract, ms []domain.ContractMilestone) *dto.ContractResponse {
+	var shareable string
+	if c.Status == domain.ContractStatusSent && s.shareableLinkBaseURL != "" {
+		shareable = s.buildShareableLink(c.ID)
+	}
+	return s.toResponseWithShareable(c, ms, shareable)
+}
+
+func (s *ContractService) toResponseWithShareable(c *domain.Contract, ms []domain.ContractMilestone, shareableLink string) *dto.ContractResponse {
 	return &dto.ContractResponse{
 		ID:                 c.ID,
 		FreelancerUserID:   c.FreelancerUserID,
@@ -208,6 +249,7 @@ func (s *ContractService) toResponse(c *domain.Contract, ms []domain.ContractMil
 		TermsAndConditions: c.TermsAndConditions,
 		Status:             c.Status,
 		SentAt:             c.SentAt,
+		ShareableLink:      shareableLink,
 		Milestones:         milestonesToResponse(ms),
 		CreatedAt:          c.CreatedAt,
 		UpdatedAt:          c.UpdatedAt,

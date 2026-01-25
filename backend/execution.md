@@ -46,7 +46,7 @@ This section is the canonical user journey. Backend phases and deliverables are 
    - **Freelancer** gets a **shareable link** to copy and send to the client personally (e.g. `ourdomain.com/contract/:id` or signed tokenised link).
 
 **Backend:** Contract service (create/update/list/get/send/delete), draft 14-day auto-delete job, shareable contract link, notification trigger for “contract sent”.  
-**Status:** ⏳ Partially done: CRUD + draft + send implemented; **not yet:** draft auto-delete, email on send, shareable link, blockchain write on sign.
+**Status:** ⏳ CRUD + draft + send + auto-delete + shareable link + email trigger done; **not yet:** blockchain write on sign, client view/sign (3.3+).
 
 ---
 
@@ -181,13 +181,19 @@ This section is the canonical user journey. Backend phases and deliverables are 
 - [x] `POST /api/v1/contracts/:id/send`  
 - [x] `DELETE /api/v1/contracts/:id` (draft only)  
 
-#### 3.2 Draft auto-delete & send experience ❌ NOT STARTED
+#### 3.2 Draft auto-delete & send experience ✅ DONE
 
 | Item | Status | Notes |
 |------|--------|--------|
-| Auto-delete drafts older than 14 days | ❌ | Cron or internal job |
-| Shareable contract link for freelancer | ❌ | e.g. contract UUID or signed token |
-| Email to client when contract is sent | ❌ | Notification service or trigger |
+| Auto-delete drafts older than 14 days | ✅ | Internal job in contract-service; `DRAFT_EXPIRY_DAYS`, `DRAFT_CLEANUP_INTERVAL_MINS` |
+| Shareable contract link for freelancer | ✅ | `SHAREABLE_LINK_BASE_URL` + `/:id`; returned in send and get when status is sent |
+| Email to client when contract is sent | ✅ | `ContractNotifier` trigger on send (no-op by default; plug in notification service later) |
+
+**Deliverables:**  
+- [x] Draft-cleanup job: `DeleteDraftsOlderThan` in repo; `DeleteExpiredDrafts` in service; `job.DraftCleanupRunner` started from main  
+- [x] `shareable_link` in contract response when status is sent and `SHAREABLE_LINK_BASE_URL` is set  
+- [x] `NotifyContractSent` trigger on send (internal/notification; NoopNotifier default)  
+- [x] Env: `SHAREABLE_LINK_BASE_URL`, `DRAFT_EXPIRY_DAYS`, `DRAFT_CLEANUP_INTERVAL_MINS`  
 
 #### 3.3 Client: view, sign, send for review ❌ NOT STARTED
 

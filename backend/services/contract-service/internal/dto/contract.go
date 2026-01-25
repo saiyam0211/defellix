@@ -73,6 +73,7 @@ type ContractResponse struct {
 	TermsAndConditions string               `json:"terms_and_conditions,omitempty"`
 	Status             string               `json:"status"`
 	SentAt             *time.Time           `json:"sent_at,omitempty"`
+	ShareableLink      string               `json:"shareable_link,omitempty"` // Set when status is sent; base URL + /:id
 	Milestones         []MilestoneResponse  `json:"milestones"`
 	CreatedAt          time.Time            `json:"created_at"`
 	UpdatedAt          time.Time            `json:"updated_at"`

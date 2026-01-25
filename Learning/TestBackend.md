@@ -1777,6 +1777,7 @@ curl -s -X PUT http://localhost:8082/api/v1/contracts/1 \
 curl -s -X POST http://localhost:8082/api/v1/contracts/1/send \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 # Expect: 200, data.status "sent", data.sent_at set
+# If SHAREABLE_LINK_BASE_URL is set: data.shareable_link == base + "/" + id
 ```
 
 **7. List sent**
@@ -1805,6 +1806,20 @@ curl -s -X DELETE http://localhost:8082/api/v1/contracts/2 \
 - [ ] Send returns 200 and `status: sent`, `sent_at` set
 - [ ] List by `status=sent` shows sent contracts
 - [ ] Delete draft returns 200; delete non-draft returns 4xx
+
+### Phase 3.2: Draft auto-delete, shareable link, email trigger
+
+**Shareable link:** Set `SHAREABLE_LINK_BASE_URL=https://app.example.com/contract` (or leave unset). Send a contract, then GET that contract — when set, response includes `shareable_link` (e.g. `https://app.example.com/contract/1`). When unset, `shareable_link` is empty/omitted.
+
+**Draft auto-delete:** Configurable via `DRAFT_EXPIRY_DAYS` (default 14) and `DRAFT_CLEANUP_INTERVAL_MINS` (default 360). The service logs `[draft-cleanup] deleted N expired draft(s)` when it runs and removes drafts. To verify: create a draft, backdate it in DB (or set `DRAFT_EXPIRY_DAYS=0` and run once for testing), wait for the next job tick or restart with a short interval, and confirm the draft is gone.
+
+**Email trigger:** `NotifyContractSent` is invoked asynchronously after send. Default is no-op; no test required until a real notifier is wired.
+
+**Phase 3.2 checklist**
+
+- [ ] With `SHAREABLE_LINK_BASE_URL` set, send returns `shareable_link` and GET contract returns it when status is sent
+- [ ] Draft-cleanup job runs periodically (observe logs or use short interval for tests)
+- [ ] Drafts older than `DRAFT_EXPIRY_DAYS` are permanently removed (manual DB check or backdate + wait)
 
 ---
 

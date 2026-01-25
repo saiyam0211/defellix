@@ -1168,6 +1168,35 @@ All except health require `Authorization: Bearer <access_token>` (same token as 
 
 ---
 
+### Phase 3.2: Draft auto-delete & send experience
+
+**Scope:** Auto-delete drafts older than 14 days, shareable contract link for freelancer, and “email to client” trigger when contract is sent.
+
+**Implementations and locations (contract-service):**
+
+- **Draft auto-delete**  
+  - Repository: `DeleteDraftsOlderThan(ctx, cutoff time.Time) (int64, error)` – hard-deletes drafts (and their milestones) with `status = draft` and `created_at < cutoff`.  
+  - Service: `DeleteExpiredDrafts(ctx) (int64, error)` – uses `DraftExpiryDays` to compute cutoff and calls repo.  
+  - Job: `internal/job/draft_cleanup.go` – `DraftCleanupRunner` runs `DeleteExpiredDrafts` every `DraftCleanupIntervalMins`. Started in main in a goroutine; stops on shutdown via context cancel.  
+  - Config: `DRAFT_EXPIRY_DAYS` (default 14), `DRAFT_CLEANUP_INTERVAL_MINS` (default 360).
+
+- **Shareable contract link**  
+  - `SHAREABLE_LINK_BASE_URL` (e.g. `https://app.ourdomain.com/contract`) is set in config.  
+  - When status is `sent`, `ContractResponse.ShareableLink` = base + `"/" + id`.  
+  - Set in service `toResponse` / `toResponseWithShareable` and in `Send` response.
+
+- **Email-to-client trigger**  
+  - `internal/notification/notifier.go`: `ContractNotifier` interface with `NotifyContractSent(ctx, contractID, clientEmail, shareableLink)`.  
+  - `NoopNotifier` is the default; implementors can send email or call a notification service.  
+  - `Send` calls `notifier.NotifyContractSent` in a goroutine after updating DB so the hot path is not blocked.
+
+**Decisions:**  
+- Draft cleanup is an in-process ticker job, not an external cron, to keep the service self-contained and documented in one place.  
+- Shareable link uses contract ID; signed/tokenised links can be added in 3.3 when client view by token exists.  
+- Email is offloaded via interface + goroutine to satisfy “heavy work off hot path” and make it easy to plug in a real notification service later.
+
+---
+
 **Document Version:** 4.0  
 **Last Updated:** January 24, 2026  
 **Next Update:** After Week 5 (signatures, milestones, IPFS)

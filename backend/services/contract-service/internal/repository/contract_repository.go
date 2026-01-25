@@ -23,6 +23,8 @@ type ContractRepository interface {
 	UpdateStatusAndSentAt(ctx context.Context, id uint, freelancerUserID uint, status string, sentAt *time.Time) error
 	Delete(ctx context.Context, id uint, freelancerUserID uint) error
 	ReplaceMilestones(ctx context.Context, contractID uint, milestones []domain.ContractMilestone) error
+	// DeleteDraftsOlderThan permanently removes draft contracts (and their milestones) with created_at < cutoff. Returns count deleted.
+	DeleteDraftsOlderThan(ctx context.Context, cutoff time.Time) (int64, error)
 }
 
 type contractRepository struct {
@@ -167,4 +169,27 @@ func (r *contractRepository) ReplaceMilestones(ctx context.Context, contractID u
 		}
 		return nil
 	})
+}
+
+func (r *contractRepository) DeleteDraftsOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
+	var deleted int64
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var ids []uint
+		if err := tx.Model(&domain.Contract{}).Where("status = ? AND created_at < ?", domain.ContractStatusDraft, cutoff).Pluck("id", &ids).Error; err != nil {
+			return err
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		if err := tx.Where("contract_id IN ?", ids).Unscoped().Delete(&domain.ContractMilestone{}).Error; err != nil {
+			return err
+		}
+		res := tx.Where("id IN ?", ids).Unscoped().Delete(&domain.Contract{})
+		if res.Error != nil {
+			return res.Error
+		}
+		deleted = res.RowsAffected
+		return nil
+	})
+	return deleted, err
 }

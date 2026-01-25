@@ -24,8 +24,11 @@ type ServerConfig struct {
 
 // AppConfig holds application-level configuration
 type AppConfig struct {
-	Environment string
-	LogLevel    string
+	Environment               string
+	LogLevel                  string
+	ShareableLinkBaseURL      string // Base for contract links, e.g. https://app.ourdomain.com/contract
+	DraftExpiryDays           int    // Delete drafts older than this (default 14)
+	DraftCleanupIntervalMins  int    // Run draft-cleanup job every N minutes (default 360 = 6h)
 }
 
 // DatabaseConfig holds PostgreSQL configuration
@@ -54,8 +57,11 @@ func Load() *Config {
 			IdleTimeout:  getEnvAsInt("SERVER_IDLE_TIMEOUT", 60),
 		},
 		App: AppConfig{
-			Environment: getEnv("APP_ENV", "development"),
-			LogLevel:    getEnv("LOG_LEVEL", "info"),
+			Environment:              getEnv("APP_ENV", "development"),
+			LogLevel:                 getEnv("LOG_LEVEL", "info"),
+			ShareableLinkBaseURL:     getEnv("SHAREABLE_LINK_BASE_URL", ""),
+			DraftExpiryDays:           getEnvAsInt("DRAFT_EXPIRY_DAYS", 14),
+			DraftCleanupIntervalMins: getEnvAsInt("DRAFT_CLEANUP_INTERVAL_MINS", 360),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
