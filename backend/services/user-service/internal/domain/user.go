@@ -54,6 +54,14 @@ type UserProfile struct {
 	CompanyName string `gorm:"type:varchar(100)" json:"company_name,omitempty"`
 	CompanySize string `gorm:"type:varchar(20)" json:"company_size,omitempty"` // startup, small, medium, large
 
+	// Public profile: ourdomain.com/user_name (unique when set; empty = not set, partial unique index in DB)
+	UserName string `gorm:"type:varchar(50);index" json:"user_name,omitempty"`
+
+	// Visibility: what to show on public profile
+	ShowProfile  bool `gorm:"default:true" json:"show_profile"`   // main profile (name, headline, bio, skills, etc.)
+	ShowProjects bool `gorm:"default:true" json:"show_projects"`  // projects section
+	ShowContracts bool `gorm:"default:false" json:"show_contracts"` // contracts section (when integrated)
+
 	// Metadata
 	IsActive          bool           `gorm:"default:true" json:"is_active"`
 	IsVerified        bool           `gorm:"default:false" json:"is_verified"`         // Email/Phone verification

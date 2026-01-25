@@ -1,73 +1,116 @@
-import {PanelsTopLeft} from  'lucide-react'
-import { IoMdHome, IoMdContract, IoMdSettings, IoMdMail, IoLogoWhatsapp } from 'react-icons/io'
-import { MdLocationOn } from 'react-icons/md'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { IoGridOutline, IoFolderOutline, IoPeopleOutline, IoPersonOutline, IoSettingsOutline, IoLogOutOutline } from "react-icons/io5";
+import { FaBolt } from "react-icons/fa6";
+import { Link } from 'react-router-dom';
 
 const Sidebar = () => {
-  const navLinks = [
-    { icon: IoMdHome, label: 'Dashboard', path: '/' },
-    { icon: IoMdContract, label: 'Contracts', path: '/contracts' },
-    { icon: IoMdSettings, label: 'Settings', path: '/settings' },
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  const mainLinks = [
+    { icon: IoGridOutline, label: 'Dashboard', path: '/' },
+    { icon: IoFolderOutline, label: 'Projects', path: '/projects' },
+    { icon: IoPeopleOutline, label: 'Team', path: '/team' },
   ]
 
-  return (
-     <div className="w-[200px] bg-[#6FB5BF] h-full rounded-e-2xl flex flex-col justify-between py-6">
+  const profileLinks = [
+    { icon: IoPersonOutline, label: 'Profile', path: '/profile' },
+    { icon: IoSettingsOutline, label: 'Profile Settings', path: '/profile/settings' },
+  ]
 
-      <div className="flex flex-col w-full px-4">
-        <div className='flex items-center justify-between mb-8'>
-            <h1 className="text-2xl font-bold text-white underline">Defellix</h1>
-            <PanelsTopLeft className="text-white" size={24} />
+  const isActive = (path: string) => {
+    if (path === '/') {
+      return location.pathname === '/'
+    }
+    if (path === '/profile') {
+      return location.pathname === '/profile' || 
+             (location.pathname.startsWith('/profile/') && !location.pathname.startsWith('/profile/settings'))
+    }
+    if (path === '/profile/settings') {
+      return location.pathname.startsWith('/profile/settings')
+    }
+    return location.pathname === path || location.pathname.startsWith(path + '/')
+  }
+
+  return (
+    <div className="w-[240px] bg-[#eaf7f6] h-full flex flex-col py-6 border border-r-teal-500">
+      <div className="px-6 mb-8">
+        <div className="flex items-center gap-2">
+          <FaBolt className="text-teal-600 text-2xl" />
+          <h1 className="text-xl font-bold text-black">Defellix</h1>
         </div>
-        
-        <nav className="flex flex-col gap-2">
-          {navLinks.map((link) => {
-            const Icon = link.icon
-            return (
-              <a
-                key={link.path}
-                href={link.path}
-                className="flex items-center gap-3 px-3 py-2.5 text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
-              >
-                <Icon className="text-xl" />
-                <span className="text-sm font-medium">{link.label}</span>
-              </a>
-            )
-          })}
-        </nav>
-     </div>
-     
-     <div className="flex flex-col items-center mx-4 mb-4 border-2 border-white/30 rounded-xl p-5 bg-white/10 backdrop-blur-sm">
-       <div className="w-20 h-20 rounded-full bg-white border-4 border-white/50 overflow-hidden mb-3">
-         <img 
-           src="https://via.placeholder.com/80" 
-           alt="Profile" 
-           className="w-full h-full object-cover"
-         />
-       </div>
-       <h3 className="text-white font-semibold text-sm mb-1.5">Alex Johnson</h3>
-       <div className="flex items-center gap-1.5 text-white/80 text-xs mb-3">
-         <MdLocationOn className="text-sm" />
-         <span>New York, USA</span>
-       </div>
-       <div className="flex items-center gap-3">
-         <a 
-           href="mailto:alex@example.com" 
-           className="text-white hover:text-white/80 transition-colors"
-           aria-label="Email"
-         >
-           <IoMdMail className="text-lg" />
-         </a>
-         <a 
-           href="https://wa.me/1234567890" 
-           target="_blank" 
-           rel="noopener noreferrer"
-           className="text-white hover:text-white/80 transition-colors"
-           aria-label="WhatsApp"
-         >
-           <IoLogoWhatsapp className="text-lg" />
-         </a>
-       </div>
-     </div>
-     </div>
+      </div>
+      <div className="flex flex-col flex-1 px-4">
+        <div className="mb-6">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-2">MAIN</h2>
+          <nav className="flex flex-col gap-1">
+            {mainLinks.map((link) => {
+              const Icon = link.icon
+              const active=isActive(link.path)
+              return (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer ${
+                    active
+                      ? 'bg-teal-600 text-white' 
+                      : 'text-white hover:bg-white/20'
+                  }`}
+                >
+                  <Icon className={`text-lg text-black ${active ? 'text-white' : 'text-black'}`}/>
+                  <span className={`font-medium text-sm ${active ? 'text-white' : 'text-black'}`}>{link.label}</span>
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
+        <div className="mb-6">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-2">PROFILE</h2>
+          <nav className="flex flex-col gap-1">
+            {profileLinks.map((link) => {
+              const Icon = link.icon
+              const active = isActive(link.path)
+              return (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer ${
+                    active 
+                      ? 'bg-teal-600 text-white' 
+                      : 'text-black hover:bg-white/20'
+                  }`}
+                >
+                  <Icon className={`text-lg ${active ? 'text-white' : 'text-black'}`}/>
+                  <span className={`font-medium text-sm ${active ? 'text-white' : 'text-black'}`}>
+                    {link.label}
+                  </span>
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
+      </div>
+      <div className="px-4 mt-auto">
+        <div className="flex items-center gap-3 p-3 bg-white/10 rounded-lg">
+          <div className="w-10 h-10 rounded-full overflow-hidden shrink-0">
+            <img 
+              src="https://via.placeholder.com/40" 
+              alt="Profile" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-black truncate">Alex Morgan</h3>
+            <p className="text-xs text-gray-600 truncate">Product Designer</p>
+          </div>
+          <button 
+            onClick={() => navigate('/login')}
+            className="shrink-0 p-1.5 hover:bg-white/20 rounded transition-colors">
+            <IoLogOutOutline className="text-lg text-black" />
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

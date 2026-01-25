@@ -1,249 +1,109 @@
-# 🚀 Next Steps Guide
+# Next Steps — Backend
+## Where we are and what to do next
 
-**Current Status:** Phase 1 & Phase 2 Complete ✅  
-**Date:** January 24, 2026
-
----
-
-## ✅ What's Done
-
-### Phase 1: Auth Service (Weeks 1-2) ✅
-- ✅ HTTP Server with Chi Router
-- ✅ Request Validation
-- ✅ Clean Architecture
-- ✅ PostgreSQL + GORM
-- ✅ Password Hashing (bcrypt)
-- ✅ JWT Token Generation/Validation
-- ✅ OAuth Integration (Google, LinkedIn, GitHub)
-- ✅ OAuth Token Encryption (AES-256-GCM)
-
-### Phase 2: User Service (Week 3) ✅
-- ✅ PostgreSQL Migration (from MongoDB)
-- ✅ User Profile CRUD
-- ✅ Skills Management
-- ✅ Projects Management (JSONB)
-- ✅ Portfolio Management
-- ✅ Search Functionality
-- ✅ Full-text Search
-- ✅ JSONB Indexes for Performance
+**Always use:** [RULES_OF_BACKEND.md](./RULES_OF_BACKEND.md) in every backend-related prompt.  
+**Source of truth for product:** User flow in [execution.md](./execution.md#1-user-flow-source-of-truth).
 
 ---
 
-## 🎯 What to Do Now
+## Where we are now
 
-### Step 1: Set Up Environment Variables
-
-**Auth Service:**
-```bash
-cd backend/services/auth-service
-cp .env.example .env  # If not exists
-nano .env
-```
-
-**Required Variables:**
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=freelancer
-DB_PASSWORD=secret
-DB_NAME=freelancer_platform
-DB_SSLMODE=disable
-JWT_SECRET=your-secret-key-min-32-characters-long
-```
-
-**User Service:**
-```bash
-cd backend/services/user-service
-cp .env.example .env  # If not exists
-nano .env
-```
-
-**Required Variables:**
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=freelancer
-DB_PASSWORD=secret
-DB_NAME=freelancer_platform  # Same as Auth Service!
-DB_SSLMODE=disable
-```
+- **Auth:** ✅ Done (login/signup, JWT, OAuth).
+- **User:** ✅ Done (profile CRUD, skills, projects, search). Pending: `user_name`, public profile, visibility.
+- **Contract:** ✅ Create/update/list/get, save as draft, send to client, delete draft.  
+  ❌ Pending: draft 14-day auto-delete, shareable link, email on send, client view/sign/send-for-review, wallets, blockchain on sign.
 
 ---
 
-### Step 2: Set Up Database
+## Recommended order of work
 
-**Option A: Local PostgreSQL**
-```bash
-# Install PostgreSQL (if not installed)
-sudo apt-get install postgresql postgresql-contrib  # Ubuntu/Debian
-brew install postgresql  # macOS
+Do these in sequence so each step has a clear input/output.
 
-# Create database
-sudo -u postgres psql
-CREATE USER freelancer WITH PASSWORD 'secret';
-CREATE DATABASE freelancer_platform OWNER freelancer;
-GRANT ALL PRIVILEGES ON DATABASE freelancer_platform TO freelancer;
-\q
-```
+### 1. Draft auto-delete (14 days)
 
-**Option B: Neon DB (Cloud - Recommended)**
-1. Sign up at https://neon.tech
-2. Create project
-3. Get connection details
-4. Update `.env` files with Neon credentials
+- **What:** Remove contracts with `status = draft` and `updated_at` (or `created_at`) older than 14 days.
+- **Where:** Contract service (or a small jobs runner that calls contract-service logic).
+- **How:** Cron or internal ticker; use a single DB query + delete in a transaction. Idempotent and safe to run daily/hourly.
+- **Rules:** [RULES_OF_BACKEND.md](./RULES_OF_BACKEND.md) — jobs off hot path, no PII in logs.
 
 ---
 
-### Step 3: Run Services
+### 2. Send experience: shareable link + email
 
-**Terminal 1 - Auth Service:**
-```bash
-cd backend/services/auth-service
-go run cmd/server/main.go
-```
-
-**Expected Output:**
-```
-Connected to database successfully
-Auth Service starting on 0.0.0.0:8080
-```
-
-**Terminal 2 - User Service:**
-```bash
-cd backend/services/user-service
-go run cmd/server/main.go
-```
-
-**Expected Output:**
-```
-Database migrations and indexes completed
-User Service starting on 0.0.0.0:8081
-```
+- **Shareable link:** For a contract in `sent` (or after send), expose a URL the freelancer can copy. Example: `GET /api/v1/contracts/:id/share-link` returning `{ "url": "https://ourdomain.com/contract/xxx" }` where `xxx` is a UUID or signed token. Frontend uses this for “Copy link”.
+- **Email on send:** When `POST /api/v1/contracts/:id/send` succeeds, enqueue or call a notification step that sends email to `contract.client_email` with the same link (or magic link). Don’t block the send API on email delivery.
 
 ---
 
-### Step 4: Test the Services
+### 3. Client: view contract by link
 
-**Test Auth Service:**
-```bash
-# Health check
-curl http://localhost:8080/health
-
-# Register user
-curl -X POST http://localhost:8080/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "password123",
-    "full_name": "Test User"
-  }'
-
-# Login
-curl -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "password123"
-  }'
-# Save the token from response!
-```
-
-**Test User Service:**
-```bash
-# Health check
-curl http://localhost:8081/health
-
-# Create profile (use token from login)
-curl -X POST http://localhost:8081/api/v1/users/me/profile \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "full_name": "Test User",
-    "short_headline": "Go Developer",
-    "role": "freelancer",
-    "skills": ["Go", "Python"]
-  }'
-```
+- **What:** Client opens the contract via the shareable link (no login required for view).
+- **Backend:** 
+  - Public or tokenised endpoint, e.g. `GET /api/v1/public/contracts/:token` that returns contract details needed for the “view + sign or send for review” screen.
+  - Token should be a UUID or signed payload (e.g. contract_id + expiry) so it can’t be guessed.
 
 ---
 
-## 📋 Week 4: What's Next?
+### 4. Client: sign or send for review
 
-According to `execution.md`, **Week 4** is part of **Phase 2** continuation:
+- **Sign:**  
+  - Accept payload: required fields (e.g. company address: remote | full address | Google Maps URL), optional (GST, business mail, Instagram, LinkedIn).  
+  - Validate (e.g. GST format if implemented).  
+  - Then: create/use wallets, write contract to blockchain, save tx id/hash/timestamp/deadline/amount/gas, set status `signed`.  
+  - Do not require the user to manage keys; wallets are created/used by the backend.
 
-### Week 4: User Service Enhancements
-
-| Day | Task | Details |
-|-----|------|---------|
-| 22-23 | Profile Search | Advanced search with filters |
-| 24-25 | Profile Verification | Email/phone verification |
-| 26-28 | gRPC Integration | Connect User Service to Auth Service |
-
-**Key Tasks:**
-1. **Advanced Search** - Already done! ✅
-2. **Profile Verification** - Add email/phone verification
-3. **gRPC Integration** - Connect services for user validation
+- **Send for review:**  
+  - Client sends a comment; status becomes e.g. `pending_review`.  
+  - Freelancer can update contract and call “send” again; client sees updated version and can sign or send for review again.
 
 ---
 
-## 🎯 Recommended Next Steps
+### 5. Wallets and blockchain on sign
 
-### Option 1: Test Everything First (Recommended)
-1. ✅ Test Auth Service endpoints
-2. ✅ Test User Service endpoints
-3. ✅ Test OAuth flows (Google, LinkedIn, GitHub)
-4. ✅ Test profile creation and updates
-5. ✅ Test search functionality
-
-### Option 2: Move to Week 4
-1. **Profile Verification** - Add email/phone verification
-2. **gRPC Integration** - Connect User Service to Auth Service
-3. **Advanced Features** - Add more profile features
-
-### Option 3: Start Phase 3 (Contract Service)
-According to `execution.md`, Phase 3 is Contract Service (Week 5+)
+- **Wallets:** Backend creates and stores custodial wallets for freelancer and client (e.g. on first contract or on sign). No UI for private keys.
+- **On sign:** One service (e.g. blockchain-service) writes the contract record on-chain and returns transaction id, hash, timestamp, etc. Contract service stores these on the contract row and sets status `signed`.
+- **Rules:** [RULES_OF_BACKEND.md](./RULES_OF_BACKEND.md) — “Zero blockchain friction”, “Legalising contracts”.
 
 ---
 
-## 📚 Documentation
+### 6. Submission and client review
 
-**Setup Guides:**
-- `backend/services/auth-service/SETUP.md` - Auth Service setup
-- `backend/services/user-service/SETUP.md` - User Service setup
+- **Submission:**  
+  - Freelancer submits: one field that matches “submission criteria” + one “detailed description” field.  
+  - Store submission; trigger email to client.
 
-**Architecture:**
-- `backend/DATABASE_ARCHITECTURE_DECISION.md` - Why PostgreSQL
-- `backend/DATABASE_INDEXES.md` - Database indexes
-- `backend/PHASE2_FINAL_SUMMARY.md` - Phase 2 summary
-
-**Testing:**
-- `Learning/TestBackend.md` - Test commands
-- `Learning/executionAccordingLearning.md` - Learning notes
+- **Review:**  
+  - Client can **Accept** or **Ask for revision** (with optional comment).  
+  - Accept/revision updates submission/contract state and can trigger emails.
 
 ---
 
-## 🚨 Important Notes
+### 7. Reputation and profile link
 
-1. **Same Database:** Both services use `freelancer_platform` database
-2. **Run Auth First:** Start Auth Service before User Service
-3. **Environment Variables:** Make sure `.env` files are configured
-4. **JWT Secret:** Use a strong secret (min 32 characters)
-
----
-
-## ✅ Checklist Before Moving Forward
-
-- [ ] Database created and accessible
-- [ ] Auth Service `.env` configured
-- [ ] User Service `.env` configured
-- [ ] Auth Service runs successfully
-- [ ] User Service runs successfully
-- [ ] Can register/login users
-- [ ] Can create profiles
-- [ ] OAuth flows work (optional)
-
-**Once all checked, you're ready for Week 4!** 🎉
+- **Reputation:** Compute per-contract score from: client review, on-time vs late, accepted vs not. Persist; later you can expose it on profile and optionally on-chain.
+- **Profile:**  
+  - Link contract to freelancer profile (e.g. `contract_id` or summary on profile).  
+  - Add visibility: freelancer chooses which contracts (and which fields) show on public profile.
 
 ---
 
-**Last Updated:** January 24, 2026
+### 8. Public profile and `user_name`
+
+- **user_name:** Add to user profile; unique; used in `ourdomain.com/user_name`.
+- **Public profile API:** e.g. `GET /api/v1/public/profile/:user_name` that returns only allowed fields based on visibility.
+- **Visibility:** Which parts of profile, projects, and contracts are shown (already referenced in execution plan).
+
+---
+
+## Quick reference
+
+| Document | Use |
+|----------|-----|
+| [RULES_OF_BACKEND.md](./RULES_OF_BACKEND.md) | Attach to every backend prompt; principles, stack, conventions. |
+| [execution.md](./execution.md) | User flow (source of truth), phases, done/not-done, deliverables. |
+| [Learning/executionAccordingLearning.md](../Learning/executionAccordingLearning.md) | How we implemented each phase. |
+| [Learning/TestBackend.md](../Learning/TestBackend.md) | How to test each phase. |
+
+---
+
+**Last updated:** January 2026

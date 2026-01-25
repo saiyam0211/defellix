@@ -48,6 +48,7 @@ type UserProfileResponse struct {
 	ID            string          `json:"id"`
 	UserID        uint            `json:"user_id"`
 	Email         string          `json:"email"`
+	UserName      string          `json:"user_name,omitempty"` // for ourdomain.com/user_name
 	FullName      string          `json:"full_name"`
 	Photo         string          `json:"photo,omitempty"`
 	ShortHeadline string          `json:"short_headline,omitempty"`
@@ -85,12 +86,39 @@ type UserProfileResponse struct {
 	CompanyName   string          `json:"company_name,omitempty"`
 	CompanySize   string          `json:"company_size,omitempty"`
 	
+	// Visibility (owner only; what is shown on public profile)
+	ShowProfile   bool `json:"show_profile,omitempty"`
+	ShowProjects  bool `json:"show_projects,omitempty"`
+	ShowContracts bool `json:"show_contracts,omitempty"`
+
 	// Metadata
-	IsActive      bool            `json:"is_active"`
-	IsVerified    bool            `json:"is_verified"`
-	IsProfileComplete bool        `json:"is_profile_complete"`
-	CreatedAt     string          `json:"created_at"`
-	UpdatedAt     string          `json:"updated_at"`
+	IsActive          bool   `json:"is_active"`
+	IsVerified        bool   `json:"is_verified"`
+	IsProfileComplete bool   `json:"is_profile_complete"`
+	CreatedAt         string `json:"created_at"`
+	UpdatedAt         string `json:"updated_at"`
+}
+
+// PublicProfileResponse is returned by GET /api/v1/public/profile/:user_name
+// Only includes sections allowed by visibility; excludes email/phone.
+type PublicProfileResponse struct {
+	UserName      string               `json:"user_name"`
+	FullName      string               `json:"full_name,omitempty"`
+	Photo         string               `json:"photo,omitempty"`
+	ShortHeadline string               `json:"short_headline,omitempty"`
+	Role          string               `json:"role,omitempty"`
+	Bio           string               `json:"bio,omitempty"`
+	Location      string               `json:"location,omitempty"`
+	Experience    string               `json:"experience,omitempty"`
+	GitHubLink    string               `json:"github_link,omitempty"`
+	LinkedInLink  string               `json:"linkedin_link,omitempty"`
+	PortfolioLink string               `json:"portfolio_link,omitempty"`
+	InstagramLink string               `json:"instagram_link,omitempty"`
+	Skills        []string             `json:"skills,omitempty"`
+	HourlyRate    *float64             `json:"hourly_rate,omitempty"`
+	Availability  string               `json:"availability,omitempty"`
+	Projects      []ProjectResponse    `json:"projects,omitempty"` // only if show_projects
+	// Contracts     []ContractSummary   `json:"contracts,omitempty"` // when integrated
 }
 
 // ProjectResponse represents a project in API response
