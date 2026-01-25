@@ -2,14 +2,18 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
+import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   IconBrandGithub,
   IconBrandGoogle,
   
 } from "@tabler/icons-react";
+import { FaLinkedin } from "react-icons/fa6";
  
 export default function LoginFormDemo() {
+const checkboxRef = useRef<HTMLInputElement>(null);
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log("Form submitted");
@@ -36,9 +40,9 @@ export default function LoginFormDemo() {
           </div>
         </LabelInputContainer>
         
-        <div className="flex gap-2 text-black mb-4">
-          <label htmlFor="checkbox">Remember me</label>
-          <input type="checkbox" name="" id="checkbox" style={{accentColor:"#009689",marginTop:"3px"}} />
+        <div className="flex gap-2 text-black mb-4 cursor-pointer">
+          <input type="checkbox" name="" id="checkbox"  className="accent" style={{accentColor:"#009689",marginTop:"3px",backgroundColor:"white"}} />
+          <label htmlFor="checkbox" className="bg=white">Remember me</label>
         </div>
  
         <button
@@ -69,6 +73,16 @@ export default function LoginFormDemo() {
             <IconBrandGoogle className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-800 dark:text-neutral-300" />
             <span className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300">
               Google
+            </span>
+            <BottomGradient />
+          </button>
+          <button
+            className="group/btn shadow-input relative flex h-10 sm:h-11 md:h-12 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-3 sm:px-4 font-medium text-xs sm:text-sm text-black dark:bg-teal-900 dark:shadow-[0px_0px_1px_1px_#262626]"
+            type="submit"
+          >
+            <FaLinkedin className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-800 dark:text-neutral-300" />
+            <span className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300">
+              Linkedin
             </span>
             <BottomGradient />
           </button>

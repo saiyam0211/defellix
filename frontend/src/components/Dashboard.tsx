@@ -24,7 +24,7 @@ const Dashboard = () => {
     };
 
     return (
-        <div className="flex-1 bg-[#fbf9f1] flex flex-col h-screen overflow-y-scroll scrBar">
+        <div className="flex-1 bg-[#fbf9f1] flex flex-col h-screen overflow-y-scroll rounded-2xl border-l-teal-700 scrBar">
             <header className="bg-[#fbf9f1] px-8 py-9 w-full">
                 <div className="flex justify-between items-center ml-2! mr-7!">
 
@@ -39,7 +39,7 @@ const Dashboard = () => {
                                 <line x1="9" y1="3" x2="9" y2="15" />
                                 <line x1="3" y1="9" x2="15" y2="9" />
                             </svg>
-                            New Contract
+                            New Project
                         </button>
 
                         <button 
@@ -108,7 +108,7 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-lg font-semibold text-gray-900 ml-5">Recent Contracts</h3>
                            
-                            <Link to="/myprofile"  className="text-sm font-bold text-white bg-teal-300 px-2 py-1 rounded-2xl mr-4"> View all</Link>
+                            <Link to="/projects"  className="text-sm font-bold text-white bg-teal-300 px-2 py-1 rounded-2xl mr-4"> View all</Link>
 
                         </div>
 

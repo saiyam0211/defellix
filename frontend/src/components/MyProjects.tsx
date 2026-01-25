@@ -1,4 +1,4 @@
-const Myprofile = () => {
+const MyProjects = () => {
     const projects = [
         {
             id: 'WR',
@@ -147,4 +147,4 @@ const Myprofile = () => {
 
     )
 }
-export default Myprofile;
+export default MyProjects;
