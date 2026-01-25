@@ -1068,6 +1068,36 @@ update := bson.M{
 
 ---
 
+### Phase 2 (Execution plan): user_name, public profile, visibility
+
+**Scope:** Unique `user_name` for `ourdomain.com/user_name`, public profile by user_name, and visibility flags (profile / projects / contracts).
+
+**Implementations and locations:**
+
+- **user_name**
+  - Stored on `user_profiles`; normalised to `[a-z0-9_]`, length 3–30. Empty allowed (no public URL).
+  - Uniqueness: app check via `FindByUserName` on create/update; DB partial unique index `WHERE user_name != '' AND user_name IS NOT NULL`.
+  - Set on create (`CreateProfileRequest.UserName`) and update (`UpdateProfileRequest.UserName`). Create/Update return `409 USER_NAME_TAKEN` or `400 INVALID_USER_NAME` when invalid or taken.
+
+- **Public profile by user_name**
+  - Route: `GET /api/v1/public/profile/{user_name}` (no auth).
+  - Handler calls `GetPublicProfileByUserName`; returns `PublicProfileResponse` (no email/phone). Returns 404 when profile not found or inactive.
+
+- **Visibility**
+  - Flags on `user_profiles`: `show_profile`, `show_projects`, `show_contracts` (defaults: true, true, false).
+  - Public response includes profile block only if `show_profile`, projects only if `show_projects`; `show_contracts` stored for future contract section.
+
+**Where it lives (user-service):**
+- `internal/domain/user.go`: `UserName`, `ShowProfile`, `ShowProjects`, `ShowContracts`
+- `internal/dto/profile.go`: `UserName` in create/update requests; `internal/dto/user.go`: `UserProfileResponse`, `PublicProfileResponse`
+- `internal/repository/user_repository.go`: `FindByUserName`, `ErrUserNameTaken`
+- `internal/service/user_service.go`: `normaliseUserName`, `ErrInvalidUserName`, `GetPublicProfileByUserName`, `UpdateProfile` (user_name + visibility)
+- `internal/service/profile_service.go`: `CreateProfile` (user_name + defaults)
+- `internal/handler/user.go`: `GetPublicProfile`, `CreateProfile` / `UpdateMyProfile` error mapping
+- `internal/config/database.go`: partial unique index on `user_name`
+
+---
+
 ### 🔄 What's Next (Phase 3)
 
 - Contract Service implementation
@@ -1078,20 +1108,67 @@ update := bson.M{
 
 ---
 
-### 📖 Key Takeaways
+## 📚 Phase 3 Week 4: Contract Service (Digital Contract Lifecycle)
 
-1. **MongoDB** provides flexible schema for varying data structures
-2. **BSON** maps Go structs to MongoDB documents
-3. **Array Operations** (`$addToSet`, `$pull`) simplify skills/portfolio management
-4. **Search Filters** can be built dynamically with BSON maps
-5. **Pagination** is essential for large result sets
-6. **Embedded Documents** store nested data efficiently
-7. **Repository Pattern** abstracts MongoDB operations
-8. **Service Layer** contains business logic separate from data access
+**Duration:** Week 4  
+**Goal:** Freelancer can create contracts (draft), save draft, and send to client.
 
 ---
 
-**Document Version:** 3.0  
+### 🏗️ Contract service layout
+
+```
+contract-service/
+├── cmd/server/main.go
+├── internal/
+│   ├── config/       # Server, DB, JWT config
+│   ├── domain/       # Contract, ContractMilestone (GORM)
+│   ├── dto/          # CreateContractRequest, UpdateContractRequest, ContractResponse
+│   ├── handler/      # ContractHandler, HealthHandler
+│   ├── middleware/   # RequireAuth(JWT), CORS, Logger, Recoverer, Validator
+│   ├── repository/   # ContractRepository (Create, GetByID, List, Update, UpdateStatusAndSentAt, Delete)
+│   └── service/      # ContractService (Create, GetByID, List, Update, Send, Delete)
+└── SETUP.md, .env.example
+```
+
+- **Same PostgreSQL** as auth/user: `freelancer_platform`. New tables: `contracts`, `contract_milestones`.
+- **JWT:** Same `JWT_SECRET` as auth-service; middleware validates access token and sets `user_id` / `user_email` in context.
+
+---
+
+### 🔧 Domain and lifecycle
+
+- **Contract:** `freelancer_user_id`, project (category, name, description, due_date, total_amount, currency, prd_file_url, submission_criteria), client (name, company, email, phone), terms_and_conditions, **status**, sent_at, timestamps.
+- **ContractMilestone:** contract_id, order_index, title, description, amount, due_date, is_initial_payment, status (e.g. pending).
+- **Status flow (Week 4):** `draft` → (send) → `sent`. Later: signed, active, completed, cancelled.
+
+---
+
+### 📡 APIs implemented
+
+| Method | Path | Purpose |
+|--------|------|--------|
+| POST | /api/v1/contracts | Create contract as draft |
+| GET | /api/v1/contracts?status=&page=&limit= | List my contracts |
+| GET | /api/v1/contracts/:id | Get one contract |
+| PUT | /api/v1/contracts/:id | Update draft only |
+| POST | /api/v1/contracts/:id/send | Draft → sent |
+| DELETE | /api/v1/contracts/:id | Delete draft only |
+
+All except health require `Authorization: Bearer <access_token>` (same token as auth-service).
+
+---
+
+### 📖 Concepts used
+
+1. **Clean architecture** – handler → service → repository, DTOs at boundary.
+2. **GORM** – same DB as other services; transactions for contract + milestones.
+3. **JWT validation** – shared secret, claims `user_id`, `email` for ownership checks.
+4. **Lifecycle rules** – update/delete only when status is `draft`; send only from `draft` to `sent`.
+
+---
+
+**Document Version:** 4.0  
 **Last Updated:** January 24, 2026  
-**Next Update:** After Phase 3 completion
+**Next Update:** After Week 5 (signatures, milestones, IPFS)
 

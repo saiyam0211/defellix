@@ -75,5 +75,13 @@ func CreateIndexes(db *gorm.DB) error {
 		return fmt.Errorf("failed to create fulltext index: %w", err)
 	}
 
+	// user_name unique when non-empty (allows many profiles with no public URL yet)
+	if err := db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_user_name_unique 
+		ON user_profiles (user_name) WHERE user_name != '' AND user_name IS NOT NULL;
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create user_name unique index: %w", err)
+	}
+
 	return nil
 }

@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/saiyam0211/defellix/services/user-service/internal/dto"
 	"github.com/saiyam0211/defellix/services/user-service/internal/middleware"
+	"github.com/saiyam0211/defellix/services/user-service/internal/repository"
 	"github.com/saiyam0211/defellix/services/user-service/internal/service"
 )
 
@@ -28,6 +30,11 @@ func NewUserHandler(userService *service.UserService, profileService *service.Pr
 
 // RegisterRoutes registers user profile routes
 func (h *UserHandler) RegisterRoutes(r chi.Router) {
+	// Public profile by user_name: ourdomain.com/user_name
+	r.Route("/api/v1/public/profile", func(r chi.Router) {
+		r.Get("/{user_name}", h.GetPublicProfile)
+	})
+
 	r.Route("/api/v1/users", func(r chi.Router) {
 		// Public routes
 		r.Get("/{id}", h.GetProfile)
@@ -35,19 +42,40 @@ func (h *UserHandler) RegisterRoutes(r chi.Router) {
 
 		// Protected routes
 		r.With(middleware.RequireAuth).Group(func(r chi.Router) {
-			r.Post("/me/profile", h.CreateProfile) // Create profile after registration
+			r.Post("/me/profile", h.CreateProfile)
 			r.Get("/me", h.GetMyProfile)
 			r.Put("/me", h.UpdateMyProfile)
 			r.Post("/me/skills", h.AddSkill)
 			r.Delete("/me/skills", h.RemoveSkill)
-			r.Post("/me/projects", h.AddProject) // Add project
-			r.Put("/me/projects/{projectId}", h.UpdateProject) // Update project
-			r.Delete("/me/projects/{projectId}", h.DeleteProject) // Delete project
-			r.Post("/me/portfolio", h.AddPortfolioItem) // Legacy portfolio
+			r.Post("/me/projects", h.AddProject)
+			r.Put("/me/projects/{projectId}", h.UpdateProject)
+			r.Delete("/me/projects/{projectId}", h.DeleteProject)
+			r.Post("/me/portfolio", h.AddPortfolioItem)
 			r.Put("/me/portfolio/{itemId}", h.UpdatePortfolioItem)
 			r.Delete("/me/portfolio/{itemId}", h.DeletePortfolioItem)
 		})
 	})
+}
+
+// GetPublicProfile returns the public profile by user_name (ourdomain.com/user_name). No auth required.
+func (h *UserHandler) GetPublicProfile(w http.ResponseWriter, r *http.Request) {
+	userName := chi.URLParam(r, "user_name")
+	if userName == "" {
+		respondError(w, http.StatusBadRequest, "user_name is required", "BAD_REQUEST")
+		return
+	}
+
+	profile, err := h.userService.GetPublicProfileByUserName(r.Context(), userName)
+	if err != nil {
+		if errors.Is(err, service.ErrProfileNotFound) {
+			respondError(w, http.StatusNotFound, "Profile not found", "PROFILE_NOT_FOUND")
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "Failed to get profile", "INTERNAL_ERROR")
+		return
+	}
+
+	respondSuccess(w, http.StatusOK, profile, "OK")
 }
 
 // GetProfile retrieves a user profile by ID
@@ -96,6 +124,14 @@ func (h *UserHandler) UpdateMyProfile(w http.ResponseWriter, r *http.Request) {
 
 	profile, err := h.userService.UpdateProfile(r.Context(), userID, &req)
 	if err != nil {
+		if errors.Is(err, repository.ErrUserNameTaken) {
+			respondError(w, http.StatusConflict, "user_name already taken", "USER_NAME_TAKEN")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidUserName) {
+			respondError(w, http.StatusBadRequest, err.Error(), "INVALID_USER_NAME")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "Failed to update profile", "INTERNAL_ERROR")
 		return
 	}
@@ -256,8 +292,16 @@ func (h *UserHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 
 	profile, err := h.profileService.CreateProfile(r.Context(), userID, userEmail, &req)
 	if err != nil {
-		if err.Error() == "profile already exists" {
+		if errors.Is(err, service.ErrProfileExists) {
 			respondError(w, http.StatusConflict, "Profile already exists", "PROFILE_EXISTS")
+			return
+		}
+		if errors.Is(err, repository.ErrUserNameTaken) {
+			respondError(w, http.StatusConflict, "This username is already taken", "USER_NAME_TAKEN")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidUserName) {
+			respondError(w, http.StatusBadRequest, err.Error(), "INVALID_USER_NAME")
 			return
 		}
 		respondError(w, http.StatusInternalServerError, "Failed to create profile", "INTERNAL_ERROR")
