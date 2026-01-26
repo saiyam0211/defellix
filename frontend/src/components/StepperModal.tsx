@@ -1,5 +1,7 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Sparkles, Upload, Plus, Trash2, ChevronDown } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -10,6 +12,10 @@ interface ProjectData {
   category: string;
   name: string;
   description: string;
+  amount: string;
+  deadline: Date | null;
+  submissionCriteria: string;
+  termsAndConditions: string;
 }
 
 interface ClientData {
@@ -28,10 +34,15 @@ interface Milestone {
 
 const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
+
   const [projectData, setProjectData] = useState<ProjectData>({
     category: '',
     name: '',
-    description: ''
+    description: '',
+    amount: '',
+    deadline: null,
+    submissionCriteria: '',
+    termsAndConditions: ''
   });
   const [clientData, setClientData] = useState<ClientData>({
     contactName: '',
@@ -49,7 +60,25 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
   const [filteredCategories, setFilteredCategories] = useState<string[]>([]);
   const categoryRef = useRef<HTMLDivElement>(null);
 
-  // All freelancing categories
+  const submissionOptions: string[] = [
+    'GitHub Repository Link',
+    'Live Website URL',
+    'Deployed Application Link',
+    'Google Drive Link',
+    'Dropbox Link',
+    'Figma/Design File Link',
+    'Video Demo Link (YouTube/Vimeo)',
+    'ZIP File Upload',
+    'PDF Document',
+    'Source Code Files',
+    'APK/IPA File (Mobile Apps)',
+    'WordPress Theme/Plugin Files',
+    'Notion/Documentation Link',
+    'Loom/Screen Recording',
+    'Presentation Slides',
+    'Other (Specify in Description)'
+  ];
+
   const allCategories: string[] = [
     'Web Development',
     'Mobile App Development',
@@ -121,11 +150,10 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
     'Other'
   ];
 
-  // Handle category input change
   const handleCategoryInputChange = (value: string) => {
     setCategoryInput(value);
     setShowCategoryDropdown(true);
-    
+
     if (value.trim() === '') {
       setFilteredCategories(allCategories);
     } else {
@@ -136,14 +164,12 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Handle category selection
   const handleCategorySelect = (category: string) => {
     setCategoryInput(category);
     setProjectData(prev => ({ ...prev, category: category }));
     setShowCategoryDropdown(false);
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
@@ -155,7 +181,6 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Initialize filtered categories
   useEffect(() => {
     setFilteredCategories(allCategories);
   }, []);
@@ -174,6 +199,48 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
       { id: Date.now(), name: '', percentage: '', description: '' }
     ]);
   };
+
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(new Date().getMonth());
+  const [viewYear, setViewYear] = useState(new Date().getFullYear());
+  const calendarRef = useRef<HTMLDivElement>(null);
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const years = Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - 50 + i);
+
+  const getDaysInMonth = () => {
+    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+    const daysCount = new Date(viewYear, viewMonth + 1, 0).getDate();
+    return { firstDay, daysCount };
+  };
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return '';
+    return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`;
+  };
+
+  const handleDateClick = (day: number) => {
+    const newDate = new Date(viewYear, viewMonth, day);
+    setProjectData(prev => ({ ...prev, deadline: newDate }));
+    setIsCalendarOpen(false);
+  };
+
+  const isDateSelected = (day: number) => {
+    if (!projectData.deadline) return false;
+    return day === projectData.deadline.getDate() &&
+      viewMonth === projectData.deadline.getMonth() &&
+      viewYear === projectData.deadline.getFullYear();
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
+        setIsCalendarOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const removeMilestone = (id: number) => {
     if (milestones.length > 1) {
@@ -203,6 +270,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
     console.log('Project Data:', projectData);
     console.log('Client Data:', clientData);
     console.log('Milestones:', milestones);
+
     onClose();
   };
 
@@ -210,7 +278,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#fbf9f1] rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div className="bg-[#fbf9f1] rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-semibold text-gray-800">Create New Project</h2>
@@ -219,18 +287,16 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Stepper Navigation - CoreUI Style */}
+        {/* Stepper Navigation */}
         <div className="px-8 py-6">
           <div className="relative">
-            {/* Progress Line */}
             <div className="absolute top-6 left-9 right-9 h-0.5 bg-gray-200" style={{ margin: '0 10%' }}>
-              <div 
-                className="h-full  bg-teal-500 transition-all duration-300 ease-in-out"
+              <div
+                className="h-full bg-teal-500 transition-all duration-300 ease-in-out"
                 style={{ width: `${((currentStep - 1) / 2) * 100}%` }}
               />
             </div>
 
-            {/* Steps */}
             <ol className="flex items-center justify-between relative">
               {[
                 { num: 1, label: 'Project Details' },
@@ -241,11 +307,10 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
                   <button
                     type="button"
                     onClick={() => setCurrentStep(step.num)}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold text-lg transition-all duration-300 transform hover:scale-110 relative z-10 ${
-                      currentStep >= step.num
-                        ? 'bg-teal-500 text-white shadow-lg'
-                        : 'bg-white text-gray-400 border-2 border-gray-300'
-                    }`}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold text-lg transition-all duration-300 transform hover:scale-110 relative z-10 ${currentStep >= step.num
+                      ? 'bg-teal-500 text-white shadow-lg'
+                      : 'bg-white text-gray-400 border-2 border-gray-300'
+                      }`}
                   >
                     {currentStep > step.num ? (
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -255,9 +320,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
                       step.num
                     )}
                   </button>
-                  <span className={`mt-2 text-sm font-medium transition-colors ${
-                    currentStep >= step.num ? 'text-teal-600' : 'text-gray-500'
-                  }`}>
+                  <span className={`mt-2 text-sm font-medium transition-colors ${currentStep >= step.num ? 'text-teal-600' : 'text-gray-500'
+                    }`}>
                     {step.label}
                   </span>
                 </li>
@@ -266,13 +330,11 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        {/* Step Content with Fade Animation */}
-        <div className="px-8 pb-6">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto px-8 pb-6">
           <div className="min-h-[400px]">
             {/* Step 1: Project Details */}
-            <div className={`transition-all duration-300 ${
-              currentStep === 1 ? 'opacity-100 block' : 'opacity-0 hidden'
-            }`}>
+            <div className={`transition-all duration-300 ${currentStep === 1 ? 'opacity-100 block' : 'opacity-0 hidden'}`}>
               <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-5">
                   <div className="relative" ref={categoryRef}>
@@ -288,12 +350,9 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
                         placeholder="Type to search or select..."
                         className="w-full px-4 py-3 pr-10 border text-gray-800 border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white transition-all"
                       />
-                      <ChevronDown 
-                        className="absolute right-3 top-3.5 text-gray-400 pointer-events-none" 
-                        size={20}
-                      />
+                      <ChevronDown className="absolute right-3 top-3.5 text-gray-400 pointer-events-none" size={20} />
                     </div>
-                    
+
                     {showCategoryDropdown && (
                       <div className="absolute z-20 w-full mt-1 text-gray-800 bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                         {filteredCategories.length > 0 ? (
@@ -307,9 +366,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
                             </div>
                           ))
                         ) : (
-                          <div className="px-4 py-3 text-gray-500 text-center">
-                            No categories found
-                          </div>
+                          <div className="px-4 py-3 text-gray-500 text-center">No categories found</div>
                         )}
                       </div>
                     )}
@@ -326,6 +383,107 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
                       placeholder="E-commerce Platform Redesign"
                       className="w-full px-4 py-3 border text-gray-800 bg-white border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
                     />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="relative" ref={calendarRef}>
+                    <p className="block text-sm font-semibold text-gray-700 mb-2">
+                      Deadline<span className="text-red-500">*</span>
+                    </p>
+
+                    <div
+                      onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                      className="flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg cursor-pointer hover:border-teal-500 bg-white transition-all"
+                    >
+                      <span className={projectData.deadline ? 'text-gray-800' : 'text-gray-400'}>
+                        {projectData.deadline ? formatDate(projectData.deadline) : 'Select a date'}
+                      </span>
+                      <Calendar className="w-5 h-5 text-gray-400" />
+                    </div>
+
+                    {isCalendarOpen && (
+                      <div className="absolute z-30 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl p-4 w-80">
+                        <div className="flex gap-2 mb-4">
+                          <select
+                            value={viewMonth}
+                            onChange={(e) => setViewMonth(Number(e.target.value))}
+                            className="flex-1 px-2 py-1 border border-gray-300 rounded text-gray-800"
+                          >
+                            {months.map((month, i) => (
+                              <option key={i} value={i}>{month}</option>
+                            ))}
+                          </select>
+
+                          <select
+                            value={viewYear}
+                            onChange={(e) => setViewYear(Number(e.target.value))}
+                            className="flex-1 px-2 py-1 border border-gray-300 rounded text-gray-800"
+                          >
+                            {years.map(year => (
+                              <option key={year} value={year}>{year}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-7 gap-1 mb-2">
+                          {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                            <div key={day} className="text-center text-xs font-semibold text-gray-500 py-2">
+                              {day}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-7 gap-1">
+                          {Array.from({ length: getDaysInMonth().firstDay }).map((_, i) => (
+                            <div key={`empty-${i}`} />
+                          ))}
+                          {Array.from({ length: getDaysInMonth().daysCount }, (_, i) => i + 1).map(day => (
+                            <button
+                              key={day}
+                              onClick={() => handleDateClick(day)}
+                              className={`aspect-square flex items-center justify-center text-sm rounded hover:bg-teal-50 transition-colors ${isDateSelected(day) ? 'bg-teal-500 text-white hover:bg-teal-600' : 'text-gray-700'}`}
+                            >
+                              {day}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="block text-sm font-semibold text-gray-700 mb-2">
+                      Amount<span className="text-red-500">*</span>
+                    </p>
+                    <input
+                      type="text"
+                      value={projectData.amount}
+                      onChange={(e) => handleProjectChange('amount', e.target.value)}
+                      placeholder="Enter the Amount"
+                      className="w-full px-4 py-3 border text-gray-800 bg-white border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Submission Criteria <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={projectData.submissionCriteria}
+                      onChange={(e) => handleProjectChange('submissionCriteria', e.target.value)}
+                      className="w-full px-4 py-3 pr-10 border text-gray-800 border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="" disabled>Select how you will submit the project</option>
+                      {submissionOptions.map((option, index) => (
+                        <option key={index} value={option} className="text-gray-800">
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-3.5 text-gray-400 pointer-events-none" size={20} />
                   </div>
                 </div>
 
@@ -357,9 +515,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
             </div>
 
             {/* Step 2: Client Details */}
-            <div className={`transition-all duration-300 ${
-              currentStep === 2 ? 'opacity-100 block' : 'opacity-0 hidden'
-            }`}>
+            <div className={`transition-all duration-300 ${currentStep === 2 ? 'opacity-100 block' : 'opacity-0 hidden'}`}>
               <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-5">
                   <div>
@@ -418,9 +574,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
             </div>
 
             {/* Step 3: Milestones */}
-            <div className={`transition-all duration-300 ${
-              currentStep === 3 ? 'opacity-100 block' : 'opacity-0 hidden'
-            }`}>
+            <div className={`transition-all duration-300 ${currentStep === 3 ? 'opacity-100 block' : 'opacity-0 hidden'}`}>
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-800">Payment Milestones</h3>
@@ -437,9 +591,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
                   {milestones.map((milestone, index) => (
                     <div key={milestone.id} className="border-2 border-gray-200 rounded-lg p-4 bg-white hover:border-teal-300 transition-all">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="font-semibold text-gray-700 text-sm">
-                          Milestone {index + 1}
-                        </span>
+                        <span className="font-semibold text-gray-700 text-sm">Milestone {index + 1}</span>
                         {milestones.length > 1 && (
                           <button
                             onClick={() => removeMilestone(milestone.id)}
@@ -454,9 +606,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
                         <input
                           type="text"
                           value={milestone.name}
-                          onChange={(e) =>
-                            updateMilestone(milestone.id, 'name', e.target.value)
-                          }
+                          onChange={(e) => updateMilestone(milestone.id, 'name', e.target.value)}
                           placeholder="e.g., Initial Payment"
                           className="px-3 py-2.5 border text-gray-800 bg-white border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
                         />
@@ -464,9 +614,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
                           <input
                             type="number"
                             value={milestone.percentage}
-                            onChange={(e) =>
-                              updateMilestone(milestone.id, 'percentage', e.target.value)
-                            }
+                            onChange={(e) => updateMilestone(milestone.id, 'percentage', e.target.value)}
                             placeholder="20"
                             min="0"
                             max="100"
@@ -478,9 +626,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
 
                       <textarea
                         value={milestone.description}
-                        onChange={(e) =>
-                          updateMilestone(milestone.id, 'description', e.target.value)
-                        }
+                        onChange={(e) => updateMilestone(milestone.id, 'description', e.target.value)}
                         placeholder="e.g., Payment will be done at project start"
                         rows={2}
                         className="w-full px-3 py-2.5 border text-gray-800 bg-white border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none transition-all"
@@ -489,16 +635,23 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
                   ))}
                 </div>
 
-                <div className="bg-teal-50 border-2 border-teal-200 rounded-lg p-4 mt-4">
-                  <p className="text-sm text-teal-800 font-medium">
-                    <strong>Total Percentage:</strong>{' '}
-                    <span className="text-lg">{milestones.reduce((sum, m) => sum + (Number(m.percentage) || 0), 0)}%</span>
-                    {milestones.reduce((sum, m) => sum + (Number(m.percentage) || 0), 0) !== 100 && (
-                      <span className="text-red-600 ml-2 font-semibold">
-                        ⚠ Must equal 100%
-                      </span>
-                    )}
-                  </p>
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      Terms and Conditions <span className="text-red-500">*</span>
+                    </label>
+                    <button className="flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 font-medium transition-colors">
+                      <Sparkles size={16} />
+                      Generate with AI
+                    </button>
+                  </div>
+                  <textarea
+                    value={projectData.termsAndConditions}
+                    onChange={(e) => handleProjectChange('termsAndConditions', e.target.value)}
+                    placeholder="Enter terms and conditions for this project. For example: payment terms, revision policy, delivery timeline, confidentiality agreements, etc."
+                    rows={6}
+                    className="w-full px-4 py-3 border text-gray-800 bg-white border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none transition-all"
+                  />
                 </div>
               </div>
             </div>
@@ -510,11 +663,10 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
           <button
             onClick={handlePrevious}
             disabled={currentStep === 1}
-            className={`px-6 py-2.5 rounded-lg font-medium transition-all ${
-              currentStep === 1
-                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-300 text-gray-700 hover:bg-gray-400 shadow-md hover:shadow-lg'
-            }`}
+            className={`px-6 py-2.5 rounded-lg font-medium transition-all ${currentStep === 1
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-gray-300 text-gray-700 hover:bg-gray-400 shadow-md hover:shadow-lg'
+              }`}
           >
             Previous
           </button>
@@ -527,17 +679,25 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose }) => {
               Next Step →
             </button>
           ) : (
-            <button
-              onClick={handleFinish}
-              className="px-6 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-all shadow-md hover:shadow-lg"
-            >
-              ✓ Finish
-            </button>
+            <div className='flex gap-2'>
+              <button
+                onClick={handleFinish}
+                className="px-6 py-2.5 bg-gray-700 text-white rounded-lg font-medium hover:bg-green-600 transition-all shadow-md hover:shadow-lg"
+              >
+                Save as Draft
+              </button>
+              <button
+                onClick={handleFinish}
+                className="px-6 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-all shadow-md hover:shadow-lg"
+              >
+                Send to Client
+              </button>
+            </div>
           )}
         </div>
       </div>
-    </div>
-  );
+      </div>
+    );
 };
 
 export default ProjectModal;
