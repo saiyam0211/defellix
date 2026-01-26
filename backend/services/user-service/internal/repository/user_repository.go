@@ -16,6 +16,8 @@ var (
 	ErrUserNotFound = errors.New("user not found")
 	// ErrUserExists indicates user already exists
 	ErrUserExists = errors.New("user already exists")
+	// ErrUserNameTaken indicates user_name is already in use by another profile
+	ErrUserNameTaken = errors.New("user_name already taken")
 )
 
 // UserRepository defines the interface for user profile data access
@@ -23,6 +25,7 @@ type UserRepository interface {
 	Create(ctx context.Context, profile *domain.UserProfile) error
 	FindByID(ctx context.Context, id uint) (*domain.UserProfile, error)
 	FindByUserID(ctx context.Context, userID uint) (*domain.UserProfile, error)
+	FindByUserName(ctx context.Context, userName string) (*domain.UserProfile, error)
 	Update(ctx context.Context, profile *domain.UserProfile) error
 	Search(ctx context.Context, filter map[string]interface{}, page, limit int64) ([]*domain.UserProfile, int64, error)
 	AddSkill(ctx context.Context, userID uint, skill string) error
@@ -72,6 +75,21 @@ func (r *userRepository) FindByID(ctx context.Context, id uint) (*domain.UserPro
 func (r *userRepository) FindByUserID(ctx context.Context, userID uint) (*domain.UserProfile, error) {
 	var profile domain.UserProfile
 	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&profile).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	return &profile, nil
+}
+
+// FindByUserName finds a user profile by public user_name (ourdomain.com/user_name)
+func (r *userRepository) FindByUserName(ctx context.Context, userName string) (*domain.UserProfile, error) {
+	if userName == "" {
+		return nil, ErrUserNotFound
+	}
+	var profile domain.UserProfile
+	if err := r.db.WithContext(ctx).Where("user_name = ?", userName).First(&profile).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
 		}

@@ -1,0 +1,55 @@
+# Binaries and build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/server
+/bin/
+/dist/
+/build/
+
+# Test and coverage
+*.test
+*.out
+coverage.html
+coverage.txt
+coverage/
+
+# Dependencies
+vendor/
+
+# Go workspace (use only if intentional)
+go.work
+go.work.sum
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+.envrc
+!.env.example
+*.env.example
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and temp
+*.log
+logs/
+tmp/
+temp/
+.cache/
+
+# Local / debug
+*.local
+*.bak
+.debug/

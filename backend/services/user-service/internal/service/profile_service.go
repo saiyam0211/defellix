@@ -6,10 +6,10 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/saiyam0211/defellix/services/user-service/internal/domain"
 	"github.com/saiyam0211/defellix/services/user-service/internal/dto"
 	"github.com/saiyam0211/defellix/services/user-service/internal/repository"
-	"github.com/google/uuid"
 )
 
 var (
@@ -43,25 +43,42 @@ func (s *ProfileService) CreateProfile(ctx context.Context, userID uint, email s
 		return nil, err
 	}
 
-	// Create profile
+	// user_name: normalise and enforce uniqueness
+	userName := ""
+	if req.UserName != "" {
+		normalised, err := normaliseUserName(req.UserName)
+		if err != nil {
+			return nil, err
+		}
+		userName = normalised
+		existing, _ := s.userRepo.FindByUserName(ctx, normalised)
+		if existing != nil {
+			return nil, repository.ErrUserNameTaken
+		}
+	}
+
 	profile := &domain.UserProfile{
-		UserID:        userID,
-		Email:         email,
-		FullName:      req.FullName,
-		Photo:         req.Photo,
-		ShortHeadline: req.ShortHeadline,
-		Role:          req.Role,
-		Location:      req.Location,
-		Experience:    req.Experience,
-		GitHubLink:    req.GitHubLink,
-		LinkedInLink:  req.LinkedInLink,
-		PortfolioLink: req.PortfolioLink,
-		InstagramLink: req.InstagramLink,
-		Skills:        skillsJSON,
-		IsActive:      true,
+		UserID:            userID,
+		Email:             email,
+		FullName:          req.FullName,
+		Photo:             req.Photo,
+		ShortHeadline:     req.ShortHeadline,
+		Role:              req.Role,
+		Location:          req.Location,
+		Experience:        req.Experience,
+		GitHubLink:        req.GitHubLink,
+		LinkedInLink:      req.LinkedInLink,
+		PortfolioLink:     req.PortfolioLink,
+		InstagramLink:     req.InstagramLink,
+		Skills:            skillsJSON,
+		UserName:          userName,
+		ShowProfile:       true,
+		ShowProjects:      true,
+		ShowContracts:     false,
+		IsActive:          true,
 		IsProfileComplete: s.checkProfileComplete(req),
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
 	}
 
 	if err := s.userRepo.Create(ctx, profile); err != nil {

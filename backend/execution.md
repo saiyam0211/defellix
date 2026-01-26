@@ -1,602 +1,292 @@
-# Backend Development Execution Plan
+# Backend Execution Plan
 ## Decentralized Freelancer Trust Platform
 
+**Mission:** Legalise freelancer contracts through blockchain and build lasting freelancer trust.  
+**Principles:** Speed, security, scale. **Rules:** See [RULES_OF_BACKEND.md](./RULES_OF_BACKEND.md) — attach to every backend prompt.
+
 **Created:** January 24, 2026  
-**Technology:** Golang Microservices + Base/Polygon L2 Blockchain  
-**Duration:** 16-20 weeks  
-**Daily Commitment:** 2-3 hours/day
+**Technology:** Go microservices + PostgreSQL + Base L2  
+**Where we are:** Phase 3 (Contract service) — draft/send done; user_name, public profile by user_name, and visibility (profile/projects/contracts) are done in user-service. Next: draft auto-delete, send→blockchain/email/link, client sign, wallets, submission, reputation.
 
 ---
 
-## 📋 Executive Summary
+## 1. User flow (source of truth)
 
-This document outlines the step-by-step development process for building the backend of the Decentralized Freelancer Trust Platform. The platform addresses critical challenges faced by 15M+ Indian freelancers including:
+This section is the canonical user journey. Backend phases and deliverables are derived from it.
 
-- **58% experiencing non-payment** for completed work
-- **High platform fees** (up to 20% on Upwork/Fiverr)
-- **Non-portable reputation** locked within platforms
-- **International payment fees** reducing ₹84,000 to ₹62,000
+### 1.1 Login / Signup → Create profile → Dashboard
 
-The backend will be built using **Golang microservices architecture** with **blockchain integration** on Base Layer-2 for immutable reputation and smart contract escrow.
+1. User lands on website → **Login** or **Signup**.
+2. After auth → **Create profile** (name, photo, headline, skills, location, experience, social links, role, etc.).
+3. User lands on **Dashboard** with:
+   - Option to **Create contract**
+   - Option to **Send contract to client**
+   - Option to **Save contract as draft**
 
----
-
-## 🏗️ System Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           API Gateway (Go + Chi)                         │
-│              Rate Limiting • Auth • Request Routing                      │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-        ┌───────────────────────────┼───────────────────────────┐
-        │                           │                           │
-        ▼                           ▼                           ▼
-┌───────────────┐         ┌───────────────┐         ┌───────────────┐
-│ Auth Service  │         │ User Service  │         │Contract Service│
-│    (Go)       │         │    (Go)       │         │    (Go)       │
-│  PostgreSQL   │         │   MongoDB     │         │ MongoDB + PG  │
-└───────────────┘         └───────────────┘         └───────────────┘
-        │                           │                           │
-        │                           │                           │
-        ▼                           ▼                           ▼
-┌───────────────┐         ┌───────────────┐         ┌───────────────┐
-│  Reputation   │         │ Notification  │         │   Dispute     │
-│   Service     │         │   Service     │         │   Service     │
-│  PostgreSQL   │         │   MongoDB     │         │  PostgreSQL   │
-└───────────────┘         └───────────────┘         └───────────────┘
-        │                           │                           │
-        └───────────────────────────┼───────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    Blockchain Service (Go + go-ethereum)                 │
-│           Base L2 Integration • Smart Contracts • Wallet Management     │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│              Shared Infrastructure                                       │
-│  Kafka/NATS (Events) • Redis (Cache) • IPFS (Files) • PostgreSQL/Mongo │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+**Backend:** Auth service (login/signup), User service (profile CRUD, `user_name` for public URL, public profile by user_name, visibility).  
+**Status:** ✅ Done (Auth + User services; `user_name`, public profile by user_name, and visibility flags implemented).
 
 ---
 
-## 🗓️ Development Timeline
+### 1.2 Create contract • Save as draft • Send to client
 
-### Phase 0: Foundation & Go Skill Building (Days 1-7)
-**Goal:** Fill critical Go knowledge gaps before backend development
+4. **Create contract** — Freelancer fills:
+   - **Project:** category, name, description, due date, amount, PRD upload (e.g. PDF URL), submission criteria.
+   - **Client:** name, company, email, phone.
+   - **Milestones:** initial payment, project milestones, milestone descriptions, terms & conditions.
 
-| Day | Focus Area | Deliverable |
-|-----|------------|-------------|
-| 1 | **Interfaces** | Practice exercises implementing Storage, Repository patterns |
-| 2 | **Context Package** | Timeout handling, cancellation patterns |
-| 3 | **Error Handling** | Custom errors, error wrapping, `errors.Is()` |
-| 4-5 | **Project Structure** | Set up clean architecture template |
-| 6-7 | **Review & Practice** | Build mini-project using all concepts |
+5. **Save as draft**
+   - Contract is stored only in backend; status `draft`.
+   - **Rule:** Drafts are **automatically deleted after 14 days** (scheduled job).
 
-**Key Resources:**
-- Go by Example: https://gobyexample.com/interfaces
-- Go Tour: https://go.dev/tour/methods/9
+6. **Send to client**
+   - Status becomes `sent`.
+   - Contract is saved in backend and, **on client sign**, also recorded on blockchain (see below).
+   - **Client** (email from contract) receives an **email** about the contract.
+   - **Freelancer** gets a **shareable link** to copy and send to the client personally (e.g. `ourdomain.com/contract/:id` or signed tokenised link).
 
-**Checkpoint:** ✅ Can explain interfaces, context, and error handling without notes
-
----
-
-### Phase 1: Auth Service (Weeks 1-2)
-**Goal:** Complete authentication microservice with JWT and OAuth
-
-#### Week 1: HTTP Server & Routing
-
-| Day | Task | Details |
-|-----|------|---------|
-| 1-2 | Basic HTTP Server | `net/http`, health endpoint, JSON responses |
-| 3-4 | Chi Router Setup | Route groups, middleware, URL params |
-| 5 | Request Validation | `go-playground/validator`, DTO structs |
-| 6-7 | Project Structure | Clean architecture: cmd/, internal/, pkg/ |
-
-**Commands:**
-```bash
-# Initialize auth service
-mkdir -p services/auth-service/{cmd/server,internal/{config,domain,dto,handler,repository,service,middleware},pkg/jwt}
-cd services/auth-service
-go mod init github.com/saiyam0211/defellix/services/auth-service
-go get github.com/go-chi/chi/v5
-go get github.com/go-playground/validator/v10
-```
-
-#### Week 2: Database & JWT
-
-| Day | Task | Details |
-|-----|------|---------|
-| 8-9 | PostgreSQL + GORM | Docker setup, connection, User model |
-| 10-11 | Password Hashing | bcrypt, JWT token generation |
-| 12 | Auth Middleware | Token validation, protected routes |
-| 13-14 | OAuth Integration | Google/LinkedIn SSO stubs |
-
-**Commands:**
-```bash
-# Start PostgreSQL
-docker run -d --name freelancer-postgres \
-  -e POSTGRES_USER=freelancer \
-  -e POSTGRES_PASSWORD=secret \
-  -e POSTGRES_DB=auth_db \
-  -p 5432:5432 postgres:15
-
-# Install dependencies
-go get gorm.io/gorm
-go get gorm.io/driver/postgres
-go get golang.org/x/crypto/bcrypt
-go get github.com/golang-jwt/jwt/v5
-```
-
-**Deliverables:**
-- [x] `/api/v1/auth/register` - User registration
-- [x] `/api/v1/auth/login` - User login with JWT
-- [x] `/api/v1/auth/refresh` - Token refresh
-- [x] `/api/v1/auth/me` - Get current user (protected)
+**Backend:** Contract service (create/update/list/get/send/delete), draft 14-day auto-delete job, shareable contract link, notification trigger for “contract sent”.  
+**Status:** ⏳ CRUD + draft + send + auto-delete + shareable link + email trigger done; **not yet:** blockchain write on sign, client view/sign (3.3+).
 
 ---
 
-### Phase 2: User Service (Week 3)
-**Goal:** User profiles, freelancer/client management
+### 1.3 Client: open contract → Sign or Send for review
 
-| Day | Task | Details |
-|-----|------|---------|
-| 15-16 | MongoDB Setup | Docker, connection, User collection |
-| 17-18 | Profile CRUD | Create, read, update profiles |
-| 19-20 | Skills & Portfolio | Skill tags, portfolio links |
-| 21 | gRPC Integration | Connect to auth-service |
+7. **Client** opens the contract (frontend; link from email or shared URL).
 
-**Commands:**
-```bash
-# Start MongoDB
-docker run -d --name freelancer-mongo \
-  -e MONGO_INITDB_ROOT_USERNAME=admin \
-  -e MONGO_INITDB_ROOT_PASSWORD=secret \
-  -p 27017:27017 mongo:7
+8. **Two actions:**
+   - **Sign contract**
+   - **Send for review** (client writes a comment; contract goes back to freelancer in **pending** state; freelancer edits and sends again).
 
-# Install MongoDB driver
-go get go.mongodb.org/mongo-driver
-```
-
-**Deliverables:**
-- [x] `/api/v1/users/{id}` - Get user profile
-- [x] `/api/v1/users/me` - Update own profile
-- [x] `/api/v1/users/search` - Search freelancers
-- [x] Freelancer skills and portfolio management
+**Backend:** Contract service — client-facing read endpoint (by token or public link), “send for review” (comment + status `pending`), “sign” (see below).  
+**Status:** ❌ Not started.
 
 ---
 
-### Phase 3: Contract Service (Weeks 4-5)
-**Goal:** Digital contract lifecycle management
+### 1.4 Client signs: details + wallet + blockchain
 
-#### Week 4: Contract CRUD
+9. When client clicks **Sign**:
+   - **Pre-filled:** email, phone (from freelancer’s contract).
+   - **Optional** (more completion = extra trust/reputation points for freelancer): company (GST number with **GST validator**), business email verification, Instagram, LinkedIn.
+   - **Required:** Company address — either “Remote” or full address or **Google Maps URL**.
 
-| Day | Task | Details |
-|-----|------|---------|
-| 22-24 | Contract Model | Domain entities, milestones, terms |
-| 25-27 | Contract CRUD | Create, update, list contracts |
-| 28 | Contract States | Draft → Sent → Signed → Active → Completed |
+10. **Wallets:** Freelancer and client wallets are **created and managed by the backend**. No blockchain knowledge or manual wallets for users.
 
-#### Week 5: Contract Features
+11. **On sign:** Contract is recorded on the **blockchain network** with at least: transaction id, hashed details, timestamp, deadline, amount, gas fee, and any other data needed for legal/audit. Contract status becomes **signed**.
 
-| Day | Task | Details |
-|-----|------|---------|
-| 29-30 | Digital Signatures | Signature capture and storage |
-| 31-32 | Milestones | Milestone tracking, submission, approval |
-| 33-35 | Document Storage | IPFS integration for contract PDFs |
-
-**Deliverables:**
-- [x] `/api/v1/contracts` - CRUD operations
-- [x] `/api/v1/contracts/{id}/send` - Send to client
-- [x] `/api/v1/contracts/{id}/sign` - Sign contract
-- [x] `/api/v1/contracts/{id}/milestones/{mid}/submit` - Submit work
-- [x] IPFS storage for contract documents
+**Backend:** Contract service (client sign payload, validation, optional GST validator), Wallet/Blockchain service (create custodial wallets, submit contract record on-chain, return tx id/hash etc.).  
+**Status:** ❌ Not started.
 
 ---
 
-### Phase 4: Reputation Service (Weeks 6-7)
-**Goal:** Scoring engine with blockchain recording
+### 1.5 After sign: submission → client review → reputation
 
-#### Week 6: Scoring Algorithm
+12. **Freelancer submits project:**
+   - One field **exactly as** the “submission criteria” defined by the freelancer in the contract.
+   - One **detailed description** field.
+   - On submit → **Client receives an email.**
 
-| Day | Task | Details |
-|-----|------|---------|
-| 36-38 | Reputation Model | Weighted scoring formula |
-| 39-40 | Rating System | Client ratings, verification bonuses |
-| 41-42 | Tier Calculation | Elite → Trusted → Established → Rising → New |
+13. **Client** can **Accept** or **Ask for revision**. Revisions loop until client accepts.
 
-**Reputation Formula:**
-```
-Score = (OnTimeDelivery × 0.30) + (ClientRatings × 0.40) + 
-        (CompletionRate × 0.10) + (VerificationLevel × 0.10) + 
-        (Experience × 0.10)
+14. **Reputation** for that contract is computed from:
+   - Client review (rating/feedback),
+   - Whether the work was submitted before or after the deadline,
+   - Whether it was accepted or not,
+   - Other agreed factors.
 
-Bonuses:
-- Verified client rating: 1.5x multiplier
-- Platform verification: +10 RP
+15. **Contract is saved to the freelancer’s user profile** with all required details and linked for display and reputation.
 
-Penalties:
-- Late milestone: -5 RP per occurrence
-```
-
-#### Week 7: Blockchain Integration
-
-| Day | Task | Details |
-|-----|------|---------|
-| 43-45 | Event Publishing | Kafka events for reputation updates |
-| 46-49 | Blockchain Service | Record reputation on Base L2 |
-
-**Deliverables:**
-- [x] `/api/v1/reputation/me` - Get own reputation
-- [x] `/api/v1/reputation/{userId}` - Get user reputation
-- [x] `/api/v1/contracts/{id}/rate` - Submit rating
-- [x] Blockchain recording of reputation changes
+**Backend:** Contract service (submission CRUD, accept/revision), Notification (email on submit), Reputation service (per-contract score, persisted and later synced to chain if planned). User service: link contract to profile, store visibility and summary.  
+**Status:** ❌ Not started.
 
 ---
 
-### Phase 5: Blockchain Service (Weeks 8-10)
-**Goal:** Base L2 integration for contracts and reputation
+### 1.6 Public profile and visibility
 
-#### Week 8: Ethereum Client Setup
+16. **Freelancer** can choose:
+   - Which **contracts** to show on the public profile,
+   - Which **details** of each contract to show,
+   - Which **profile** and **project** information is visible.
 
-| Day | Task | Details |
-|-----|------|---------|
-| 50-52 | go-ethereum Setup | RPC connection, chain ID |
-| 53-56 | Wallet Management | Custodial wallet creation, key encryption |
+17. **Unique public profile URL:** `ourdomain.com/user_name` — `user_name` is set when creating/editing profile and must be unique.
 
-**Commands:**
-```bash
-go get github.com/ethereum/go-ethereum
-```
-
-**Configuration:**
-```go
-// Base L2 Mainnet
-rpcURL := "https://mainnet.base.org"
-chainID := 8453
-
-// Base L2 Sepolia (Testnet)
-rpcURL := "https://sepolia.base.org"
-chainID := 84532
-```
-
-#### Week 9: Smart Contract Integration
-
-| Day | Task | Details |
-|-----|------|---------|
-| 57-59 | ABI Generation | Generate Go bindings from Solidity ABI |
-| 60-63 | Contract Interactions | Create contract, update reputation on-chain |
-
-**Smart Contract Methods:**
-```solidity
-// FreelancerTrustRegistry.sol
-function createContract(
-    bytes32 contractHash,
-    address freelancer,
-    address client,
-    string memory ipfsHash,
-    uint256 amount
-) external;
-
-function updateReputation(
-    address user,
-    uint256 newScore,
-    bytes32 contractHash
-) external;
-
-function getReputation(address user) external view returns (uint256);
-```
-
-#### Week 10: Event Processing
-
-| Day | Task | Details |
-|-----|------|---------|
-| 64-66 | Kafka Consumers | Process contract.signed events |
-| 67-70 | Transaction Management | Gas estimation, retries, confirmations |
-
-**Deliverables:**
-- [x] Custodial wallet creation for users
-- [x] Smart contract interactions
-- [x] Event-driven blockchain recording
-- [x] Transaction status tracking
+**Backend:** User service — `user_name` (unique), visibility flags for profile / projects / contracts and per-contract visibility, public profile API by `user_name`.  
+**Status:** ✅ Done for profile/projects/contracts visibility and public-by-username API; per-contract visibility and contract section on public profile to be added when contract data is linked (Phase 4).
 
 ---
 
-### Phase 6: Notification Service (Week 11)
-**Goal:** Email, SMS, and push notifications
+## 2. Backend phases (mapped to user flow)
 
-| Day | Task | Details |
-|-----|------|---------|
-| 71-73 | Email Integration | SendGrid/AWS SES |
-| 74-75 | SMS Integration | Twilio/MSG91 |
-| 76-77 | Event Consumers | Process notification events from Kafka |
+### Phase 1: Auth service — Login / Signup ✅ DONE
 
-**Notification Events:**
-- `user.registered` → Welcome email
-- `contract.sent` → Email to client
-- `contract.signed` → Email to both parties
-- `milestone.submitted` → Notify client
-- `milestone.approved` → Notify freelancer
-- `rating.received` → Notify rated user
+**Goal:** Secure login, signup, JWT, OAuth.
 
-**Deliverables:**
-- [x] Email notifications
-- [x] SMS notifications
-- [x] Kafka event consumers
-- [x] Notification templates
+| Item | Status | Notes |
+|------|--------|--------|
+| HTTP server, Chi, validation, clean layout | ✅ | |
+| PostgreSQL + GORM, User model | ✅ | |
+| Register, Login, Refresh, /me | ✅ | |
+| Password hashing (bcrypt), JWT | ✅ | |
+| OAuth (Google, LinkedIn, GitHub) | ✅ | |
+
+**Deliverables:**  
+- [x] `POST /api/v1/auth/register`  
+- [x] `POST /api/v1/auth/login`  
+- [x] `POST /api/v1/auth/refresh`  
+- [x] `GET /api/v1/auth/me`  
+- [x] OAuth initiate/callback and token encryption  
 
 ---
 
-### Phase 7: Verification Service (Week 12)
-**Goal:** KYC and document verification
+### Phase 2: User service — Profile & dashboard readiness ✅ DONE
 
-| Day | Task | Details |
-|-----|------|---------|
-| 78-80 | Identity Verification | Phone OTP, Email verification |
-| 81-82 | LinkedIn Integration | OAuth for professional verification |
-| 83-84 | GitHub Integration | OAuth for developer verification |
+**Goal:** Profile CRUD, skills, projects, search; `user_name`, public profile, visibility.
 
-**Verification Levels:**
-| Level | Requirements | Reputation Bonus |
-|-------|--------------|------------------|
-| Basic | Email verified | 0 |
-| Verified | Phone + Email | +5 RP |
-| Professional | LinkedIn verified | +10 RP |
-| Developer | GitHub verified | +10 RP |
+| Item | Status | Notes |
+|------|--------|--------|
+| PostgreSQL (same DB), user_profiles | ✅ | |
+| Create/update profile, skills, projects | ✅ | |
+| Search freelancers | ✅ | |
+| `user_name` (unique), set on profile | ✅ | For ourdomain.com/user_name; normalised [a-z0-9_], 3–30 chars |
+| Public profile by user_name | ✅ | `GET /api/v1/public/profile/{user_name}` (no auth) |
+| Visibility: profile / projects / contracts | ✅ | show_profile, show_projects, show_contracts on profile |
 
-**Deliverables:**
-- [x] `/api/v1/verify/email` - Email verification
-- [x] `/api/v1/verify/phone` - Phone OTP
-- [x] `/api/v1/verify/linkedin` - LinkedIn OAuth
-- [x] `/api/v1/verify/github` - GitHub OAuth
+**Deliverables:**  
+- [x] `GET/PUT /api/v1/users/me`, `POST /api/v1/users/me/profile`  
+- [x] Skills, projects, portfolio APIs  
+- [x] `GET /api/v1/users/:id`, `POST /api/v1/users/search`  
+- [x] `user_name` in profile, uniqueness (create/update); 409 USER_NAME_TAKEN, 400 INVALID_USER_NAME  
+- [x] `GET /api/v1/public/profile/{user_name}`  
+- [x] Visibility flags (show_profile, show_projects, show_contracts); per-contract “show on profile” in Phase 4 when contracts are linked  
 
 ---
 
-### Phase 8: Dispute Service (Week 13)
-**Goal:** Dispute resolution workflow
+### Phase 3: Contract service — Draft, send, link, and lifecycle 🔄 IN PROGRESS
 
-| Day | Task | Details |
-|-----|------|---------|
-| 85-87 | Dispute Model | Dispute states, evidence attachments |
-| 88-91 | Resolution Workflow | Submit → Review → Mediate → Resolve |
+**Goal:** Create/save draft, send to client, shareable link, draft auto-delete, then client sign/review and blockchain on sign.
 
-**Dispute States:**
-```
-Submitted → Under Review → Mediation → Resolved/Escalated
-```
+#### 3.1 Contract CRUD + draft + send (Week 4) ✅ DONE
 
-**Deliverables:**
-- [x] `/api/v1/disputes` - Create dispute
-- [x] `/api/v1/disputes/{id}` - Get dispute details
-- [x] `/api/v1/disputes/{id}/evidence` - Submit evidence
-- [x] `/api/v1/disputes/{id}/resolve` - Admin resolution
+| Item | Status | Notes |
+|------|--------|--------|
+| Create contract (draft) | ✅ | Project, client, milestones, terms |
+| Update draft, list, get | ✅ | |
+| Send to client (draft → sent) | ✅ | Status + sent_at only |
+| Delete draft | ✅ | |
 
----
+**Deliverables:**  
+- [x] `POST /api/v1/contracts`  
+- [x] `GET /api/v1/contracts`, `GET /api/v1/contracts/:id`  
+- [x] `PUT /api/v1/contracts/:id` (draft only)  
+- [x] `POST /api/v1/contracts/:id/send`  
+- [x] `DELETE /api/v1/contracts/:id` (draft only)  
 
-### Phase 9: API Gateway (Week 14)
-**Goal:** Unified entry point with cross-cutting concerns
+#### 3.2 Draft auto-delete & send experience ✅ DONE
 
-| Day | Task | Details |
-|-----|------|---------|
-| 92-94 | Route Configuration | Service routing, load balancing |
-| 95-96 | Rate Limiting | Per-IP and per-user limits |
-| 97-98 | CORS & Security | Headers, request validation |
+| Item | Status | Notes |
+|------|--------|--------|
+| Auto-delete drafts older than 14 days | ✅ | Internal job in contract-service; `DRAFT_EXPIRY_DAYS`, `DRAFT_CLEANUP_INTERVAL_MINS` |
+| Shareable contract link for freelancer | ✅ | `SHAREABLE_LINK_BASE_URL` + `/:id`; returned in send and get when status is sent |
+| Email to client when contract is sent | ✅ | `ContractNotifier` trigger on send (no-op by default; plug in notification service later) |
 
-**Gateway Features:**
-- Rate limiting: 100 requests/minute/IP
-- Authentication at gateway level
-- Request logging and tracing
-- Health checks for all services
+**Deliverables:**  
+- [x] Draft-cleanup job: `DeleteDraftsOlderThan` in repo; `DeleteExpiredDrafts` in service; `job.DraftCleanupRunner` started from main  
+- [x] `shareable_link` in contract response when status is sent and `SHAREABLE_LINK_BASE_URL` is set  
+- [x] `NotifyContractSent` trigger on send (internal/notification; NoopNotifier default)  
+- [x] Env: `SHAREABLE_LINK_BASE_URL`, `DRAFT_EXPIRY_DAYS`, `DRAFT_CLEANUP_INTERVAL_MINS`  
 
-**Deliverables:**
-- [x] Unified API routing
-- [x] Rate limiting middleware
-- [x] Authentication middleware
-- [x] Health check aggregation
+#### 3.3 Client: view, sign, send for review ❌ NOT STARTED
 
----
+| Item | Status | Notes |
+|------|--------|--------|
+| Client view contract by link/token | ❌ | No login required for view; token in URL or magic link |
+| Client sign: required/optional fields | ❌ | Email, phone prefill; address required (remote/address/maps URL); optional GST, business mail, Instagram, LinkedIn |
+| GST number validator | ❌ | Optional; integration or rule set TBD |
+| Send for review (comment, status pending) | ❌ | Freelancer can update and re-send |
 
-### Phase 10: Testing & Quality (Week 15)
-**Goal:** Comprehensive test coverage
+#### 3.4 Wallets & blockchain on sign ❌ NOT STARTED
 
-| Day | Task | Details |
-|-----|------|---------|
-| 99-101 | Unit Tests | Service layer tests with mocks |
-| 102-104 | Integration Tests | Database and API tests |
-| 105 | Load Testing | k6 scripts for performance |
-
-**Commands:**
-```bash
-# Install testing tools
-go get github.com/stretchr/testify
-go install github.com/golang/mock/mockgen@latest
-
-# Run tests
-go test ./... -v -cover
-```
-
-**Coverage Targets:**
-- Unit tests: 80%+
-- Integration tests: Core flows
-- Load tests: 1000 concurrent users
+| Item | Status | Notes |
+|------|--------|--------|
+| Auto-create custodial wallet (freelancer) | ❌ | On sign or earlier; no user key handling |
+| Auto-create custodial wallet (client) | ❌ | Same |
+| On client sign → write contract to chain | ❌ | tx id, hash, timestamp, deadline, amount, gas, etc. |
+| Persist blockchain metadata on contract | ❌ | Link contract row to on-chain record |
 
 ---
 
-### Phase 11: Production Readiness (Week 16)
-**Goal:** Docker, Kubernetes, observability
+### Phase 4: Submission, review, reputation, profile link ❌ NOT STARTED
 
-| Day | Task | Details |
-|-----|------|---------|
-| 106-107 | Dockerfiles | Multi-stage builds for all services |
-| 108-109 | Docker Compose | Local development environment |
-| 110-111 | Kubernetes | Deployment manifests |
-| 112 | Logging | Structured logging with Zap |
+**Goal:** Freelancer submits against “submission criteria” + detailed desc; client accept/revision; per-contract reputation; attach contract to profile.
 
-**Commands:**
-```bash
-# Install logging
-go get go.uber.org/zap
-
-# Build all services
-docker-compose build
-
-# Deploy to local k8s
-kubectl apply -f infrastructure/k8s/
-```
-
-**Deliverables:**
-- [x] Dockerfiles for all services
-- [x] docker-compose.yml for development
-- [x] Kubernetes manifests
-- [x] Structured logging
-- [x] Graceful shutdown handling
+| Item | Status | Notes |
+|------|--------|--------|
+| Submission: criteria field + detailed desc | ❌ | Stored on contract/submission entity |
+| Client accept / ask for revision | ❌ | Status and optional comment |
+| Email to client on submission | ❌ | |
+| Reputation score per contract | ❌ | From review, deadline, acceptance |
+| Save contract (and summary) to user profile | ❌ | Link contract_id to profile, store chosen visibility |
+| Freelancer chooses which contracts/details to show | ❌ | Visibility rules in user/contract service |
 
 ---
 
-## 📁 Final Project Structure
+### Phase 5: Notifications, verification, disputes (as needed)
 
-```
-backend/
-├── services/
-│   ├── api-gateway/
-│   │   ├── cmd/server/main.go
-│   │   ├── internal/
-│   │   │   ├── config/
-│   │   │   ├── middleware/
-│   │   │   └── gateway/
-│   │   ├── Dockerfile
-│   │   └── go.mod
-│   ├── auth-service/
-│   │   ├── cmd/server/main.go
-│   │   ├── internal/
-│   │   │   ├── config/
-│   │   │   ├── domain/
-│   │   │   ├── dto/
-│   │   │   ├── handler/
-│   │   │   ├── repository/
-│   │   │   ├── service/
-│   │   │   └── middleware/
-│   │   ├── pkg/jwt/
-│   │   ├── api/proto/auth.proto
-│   │   ├── migrations/
-│   │   ├── Dockerfile
-│   │   └── go.mod
-│   ├── user-service/
-│   ├── contract-service/
-│   ├── reputation-service/
-│   ├── blockchain-service/
-│   ├── notification-service/
-│   ├── verification-service/
-│   ├── dispute-service/
-│   └── file-service/
-├── shared/
-│   ├── proto/              # gRPC definitions
-│   ├── events/             # Kafka event schemas
-│   └── pkg/                # Shared utilities
-├── infrastructure/
-│   ├── docker/
-│   │   └── docker-compose.yml
-│   ├── k8s/
-│   │   ├── auth-service.yaml
-│   │   ├── user-service.yaml
-│   │   └── ...
-│   └── terraform/
-└── docs/
-    ├── api/
-    └── architecture/
-```
+**Goal:** Emails (send, sign, submit, review), optional verification (GST, business mail, etc.), optional dispute flow.
+
+- Notification service or integrations for: contract sent, contract signed, submission, review.
+- Verification: business mail, GST, etc., only if product decides to use them for “extra points” or compliance.
+- Disputes: separate phase if we add a formal dispute flow.
 
 ---
 
-## 🔧 Technology Stack Summary
+### Phase 6: API gateway, production, observability
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **Language** | Go 1.21+ | Backend services |
-| **HTTP Router** | go-chi/chi | REST API routing |
-| **PostgreSQL** | v15 | Auth, Reputation, Disputes |
-| **MongoDB** | v7 | Users, Contracts, Notifications |
-| **Redis** | v7 | Caching, Rate limiting, Sessions |
-| **Kafka** | v3.6 | Event streaming |
-| **gRPC** | protobuf | Inter-service communication |
-| **Blockchain** | Base L2 | Immutable reputation, contracts |
-| **IPFS** | Pinata | Document storage |
-| **Docker** | Latest | Containerization |
-| **Kubernetes** | Latest | Orchestration |
+**Goal:** Single entrypoint, rate limiting, auth, logging, deployment.  
+Deferred until core contract + reputation + profile flow is stable.
 
 ---
 
-## ✅ Success Criteria
+## 3. Where we are now (summary)
 
-### MVP Completion (Week 16)
-- [ ] All 9 microservices deployed
-- [ ] User registration and authentication working
-- [ ] Contract creation and signing flow complete
-- [ ] Reputation scoring and blockchain recording functional
-- [ ] Basic notifications working
-- [ ] API documentation complete
+| Area | Done | Next |
+|------|------|------|
+| **Auth** | Register, login, refresh, OAuth, JWT | — |
+| **User** | Profile CRUD, skills, projects, search | `user_name`, public profile, visibility |
+| **Contract** | Create/update/list/get, draft, send, delete | Draft 14-day delete; shareable link; email on send; client view/sign/review; wallets; blockchain on sign |
+| **Submission & review** | — | Submission API, accept/revision, emails |
+| **Reputation** | — | Per-contract score, persist, optionally on-chain |
+| **Profile linkage** | — | Contract on profile, visibility, public `user_name` |
 
-### Performance Targets
-- API response time: < 200ms (p95)
-- Blockchain transactions: < 5s confirmation
-- Concurrent users: 1000+
-- Uptime: 99.5%
+**Immediate next steps (in order):**
 
-### Security Checklist
-- [ ] JWT tokens with proper expiration
-- [ ] Password hashing with bcrypt
-- [ ] Rate limiting on all endpoints
-- [ ] Input validation on all requests
-- [ ] CORS configured properly
-- [ ] Secrets managed securely (env/vault)
-- [ ] SQL injection prevention
-- [ ] XSS prevention
+1. **Draft auto-delete:** Job that deletes contracts in `draft` older than 14 days.
+2. **Send experience:** Shareable contract link; trigger “contract sent” email to client.
+3. **Client flow:** View by link, sign (with required/optional fields), send for review.
+4. **Wallets + blockchain:** Create freelancer/client wallets; on client sign, write contract to chain and save tx id/hash etc.
+5. **Submission and review:** Submit work (criteria + detailed desc), client accept/revision, emails.
+6. **Reputation:** Per-contract score from review/deadline/acceptance; store and optionally expose on profile.
+7. **Profile:** `user_name`, public profile URL, visibility for profile/projects/contracts.
 
 ---
 
-## 📚 Essential Resources
+## 4. Technology and layout (aligned with RULES_OF_BACKEND)
 
-### Go Learning
-- [Go by Example](https://gobyexample.com/)
-- [Go Tour](https://go.dev/tour/)
-- [Effective Go](https://go.dev/doc/effective_go)
-
-### Blockchain
-- [go-ethereum Documentation](https://geth.ethereum.org/docs)
-- [Base Documentation](https://docs.base.org/)
-- [Solidity by Example](https://solidity-by-example.org/)
-
-### Tools
-- [Chi Router](https://github.com/go-chi/chi)
-- [GORM](https://gorm.io/docs/)
-- [Zap Logger](https://github.com/uber-go/zap)
+- **Stack:** Go, Chi, PostgreSQL (shared `freelancer_platform`), GORM. JWT validated with same secret as auth.
+- **Layout per service:** `cmd/server`, `internal/{config,domain,dto,handler,middleware,repository,service}`. See [RULES_OF_BACKEND.md](./RULES_OF_BACKEND.md).
+- **DB:** Auth, user, contract (and later reputation, etc.) use the same PostgreSQL instance unless the plan explicitly splits them.
 
 ---
 
-## 🚀 Getting Started
+## 5. References
 
-```bash
-# 1. Clone and setup
-cd backend
-go mod init github.com/saiyam/freelancer-platform
-
-# 2. Start infrastructure
-docker-compose -f infrastructure/docker/docker-compose.yml up -d
-
-# 3. Start with auth-service (Phase 1)
-cd services/auth-service
-go mod init github.com/saiyam/freelancer-platform/services/auth-service
-go run cmd/server/main.go
-
-# 4. Verify
-curl http://localhost:8080/health
-```
+- **[RULES_OF_BACKEND.md](./RULES_OF_BACKEND.md)** — Attach to every backend prompt. Principles, stack, layout, security, contract/blockchain policy.
+- **User flow (above)** — Single source of truth for product intent; backend tasks are derived from it.
+- **Learning/executionAccordingLearning.md** — Implementation notes per phase.
+- **Learning/TestBackend.md** — How to test each phase.
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** January 24, 2026  
-**Next Review:** After Phase 1 completion
+**Document version:** 2.0  
+**Last updated:** January 2026  
+**Next review:** After draft auto-delete and send-experience (link + email) are implemented.

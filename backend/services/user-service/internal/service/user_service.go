@@ -22,7 +22,28 @@ var (
 	ErrProfileNotFound = errors.New("profile not found")
 	// ErrUnauthorized indicates user is not authorized
 	ErrUnauthorized = errors.New("unauthorized")
+	// ErrInvalidUserName indicates user_name has invalid format (use only a-z, 0-9, underscore)
+	ErrInvalidUserName = errors.New("user_name must be 3–30 characters, lowercase letters, numbers and underscores only")
 )
+
+// normaliseUserName returns lowercase user_name containing only [a-z0-9_], or error if invalid
+func normaliseUserName(s string) (string, error) {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "" {
+		return "", nil
+	}
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			b.WriteRune(r)
+		}
+	}
+	out := b.String()
+	if len(out) < 3 || len(out) > 30 {
+		return "", ErrInvalidUserName
+	}
+	return out, nil
+}
 
 // UserService handles user profile business logic
 type UserService struct {
@@ -56,6 +77,23 @@ func (s *UserService) GetProfileByUserID(ctx context.Context, userID uint) (*dto
 		return nil, err
 	}
 	return s.toProfileResponse(profile), nil
+}
+
+// GetPublicProfileByUserName returns the public profile for ourdomain.com/user_name.
+// Only includes sections allowed by visibility; never returns email or phone.
+func (s *UserService) GetPublicProfileByUserName(ctx context.Context, userName string) (*dto.PublicProfileResponse, error) {
+	userName = strings.ToLower(strings.TrimSpace(userName))
+	if userName == "" {
+		return nil, ErrProfileNotFound
+	}
+	profile, err := s.userRepo.FindByUserName(ctx, userName)
+	if err != nil {
+		return nil, err
+	}
+	if !profile.IsActive {
+		return nil, ErrProfileNotFound
+	}
+	return s.toPublicProfileResponse(profile), nil
 }
 
 // UpdateProfile updates a user profile
@@ -122,6 +160,27 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uint, req *dto.U
 	}
 	if req.CompanySize != "" {
 		profile.CompanySize = req.CompanySize
+	}
+	if req.UserName != "" {
+		normalised, err := normaliseUserName(req.UserName)
+		if err != nil {
+			return nil, err
+		}
+		profile.UserName = normalised
+		// Uniqueness: must not be taken by another profile
+		existing, _ := s.userRepo.FindByUserName(ctx, normalised)
+		if existing != nil && existing.UserID != userID {
+			return nil, repository.ErrUserNameTaken
+		}
+	}
+	if req.ShowProfile != nil {
+		profile.ShowProfile = *req.ShowProfile
+	}
+	if req.ShowProjects != nil {
+		profile.ShowProjects = *req.ShowProjects
+	}
+	if req.ShowContracts != nil {
+		profile.ShowContracts = *req.ShowContracts
 	}
 
 	// Save profile
@@ -354,6 +413,7 @@ func (s *UserService) toProfileResponse(profile *domain.UserProfile) *dto.UserPr
 		ID:                fmt.Sprintf("%d", profile.ID),
 		UserID:            profile.UserID,
 		Email:             profile.Email,
+		UserName:          profile.UserName,
 		FullName:          profile.FullName,
 		Photo:             profile.Photo,
 		ShortHeadline:     profile.ShortHeadline,
@@ -378,12 +438,51 @@ func (s *UserService) toProfileResponse(profile *domain.UserProfile) *dto.UserPr
 		Testimonials:      testimonials,
 		CompanyName:       profile.CompanyName,
 		CompanySize:       profile.CompanySize,
+		ShowProfile:       profile.ShowProfile,
+		ShowProjects:      profile.ShowProjects,
+		ShowContracts:     profile.ShowContracts,
 		IsActive:          profile.IsActive,
 		IsVerified:        profile.IsVerified,
 		IsProfileComplete: profile.IsProfileComplete,
 		CreatedAt:         profile.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:         profile.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
+}
+
+func (s *UserService) toPublicProfileResponse(profile *domain.UserProfile) *dto.PublicProfileResponse {
+	out := &dto.PublicProfileResponse{
+		UserName: profile.UserName,
+	}
+	if profile.ShowProfile {
+		out.FullName = profile.FullName
+		out.Photo = profile.Photo
+		out.ShortHeadline = profile.ShortHeadline
+		out.Role = profile.Role
+		out.Bio = profile.Bio
+		out.Location = profile.Location
+		out.Experience = profile.Experience
+		out.GitHubLink = profile.GitHubLink
+		out.LinkedInLink = profile.LinkedInLink
+		out.PortfolioLink = profile.PortfolioLink
+		out.InstagramLink = profile.InstagramLink
+		out.HourlyRate = profile.HourlyRate
+		out.Availability = profile.Availability
+		var skills []string
+		if len(profile.Skills) > 0 {
+			_ = json.Unmarshal(profile.Skills, &skills)
+		}
+		out.Skills = skills
+	}
+	if profile.ShowProjects && len(profile.Projects) > 0 {
+		var projs []domain.Project
+		if err := json.Unmarshal(profile.Projects, &projs); err == nil {
+			out.Projects = make([]dto.ProjectResponse, len(projs))
+			for i := range projs {
+				out.Projects[i] = s.toProjectResponse(&projs[i])
+			}
+		}
+	}
+	return out
 }
 
 func (s *UserService) toProjectResponse(project *domain.Project) dto.ProjectResponse {

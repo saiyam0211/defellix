@@ -1563,6 +1563,73 @@ curl -X PUT http://localhost:8081/api/v1/users/me/portfolio/invalid_id \
 
 ---
 
+### Phase 2 (Execution): user_name, public profile, visibility
+
+**Goal:** Verify `user_name` (unique slug), visibility flags, and public profile by user_name.  
+**Service:** user-service. **Base URL:** e.g. `http://localhost:8081`. Use a valid `Authorization: Bearer <access_token>` for protected routes.
+
+#### 1. Set user_name on create profile
+
+```bash
+# Create profile with user_name (replace TOKEN, ensure user has no profile yet)
+curl -s -X POST http://localhost:8081/api/v1/users/me/profile \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "full_name": "Jane Doe",
+    "short_headline": "Full-stack developer",
+    "role": "freelancer",
+    "user_name": "jane_doe"
+  }'
+```
+
+**Expected:** `201 Created`; response includes `user_name: "jane_doe"` (or normalised form).  
+
+**Invalid user_name (too short or bad chars):** use `"user_name": "ab"` or `"user_name": "Jane Doe"` → `400 Bad Request`, `code`: `INVALID_USER_NAME`.
+
+#### 2. Update user_name and visibility (PUT /api/v1/users/me)
+
+```bash
+curl -s -X PUT http://localhost:8081/api/v1/users/me \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_name": "jane_dev",
+    "show_profile": true,
+    "show_projects": true,
+    "show_contracts": false
+  }'
+```
+
+**Expected:** `200 OK`; profile shows updated `user_name` and visibility flags.  
+**Conflict:** set `user_name` to a value another profile already has → `409 Conflict`, `code`: `USER_NAME_TAKEN`.
+
+#### 3. Public profile by user_name (no auth)
+
+```bash
+# Existing, active profile with user_name
+curl -s http://localhost:8081/api/v1/public/profile/jane_dev
+```
+
+**Expected:** `200 OK`; JSON must **not** include email or phone. Profile block and projects appear according to `show_profile` and `show_projects`.
+
+```bash
+# Non-existent or inactive
+curl -s http://localhost:8081/api/v1/public/profile/nonexistent_slug_999
+```
+
+**Expected:** `404 Not Found`.
+
+#### Phase 2 (user_name & public profile) checklist
+
+- [ ] `user_name` can be set on create profile and normalised (e.g. lowercase, `[a-z0-9_]` only)
+- [ ] Duplicate `user_name` returns `409 USER_NAME_TAKEN` on create and update
+- [ ] Invalid `user_name` (length/characters) returns `400 INVALID_USER_NAME`
+- [ ] `GET /api/v1/public/profile/{user_name}` returns 200 and respects visibility (no email/phone)
+- [ ] `GET /api/v1/public/profile/{user_name}` returns 404 when user_name missing or profile inactive
+
+---
+
 ### 🎯 Phase 2 Completion Checklist
 
 - [ ] MongoDB is running and accessible
@@ -1576,6 +1643,7 @@ curl -X PUT http://localhost:8081/api/v1/users/me/portfolio/invalid_id \
 - [ ] Protected routes require authentication
 - [ ] Error handling returns appropriate status codes
 - [ ] Validation works for all endpoints
+- [ ] Phase 2 (user_name & public profile) checklist above is verified
 
 ---
 
@@ -1627,6 +1695,134 @@ chmod +x test_phase2.sh
 
 ---
 
+## 🧪 Phase 3 Week 4: Contract Service – Draft & Send
+
+**Goal:** Verify contract create (draft), update, list, get, send, and delete.
+
+### Prerequisites
+
+1. Auth-service and contract-service running.
+2. **DB:** Same PostgreSQL as auth/user (`freelancer_platform`). Contract-service creates `contracts` and `contract_milestones`.
+3. **JWT:** Set `JWT_SECRET` in contract-service to the same value as auth-service.
+4. Get an access token: login via auth-service, copy `access_token`.
+
+```bash
+# Start contract-service
+cd backend/services/contract-service
+go run cmd/server/main.go
+# Default: http://localhost:8082
+```
+
+### Test cases
+
+**1. Health**
+```bash
+curl -s http://localhost:8082/health
+# Expect: "service":"contract-service", "status":"healthy"
+```
+
+**2. Create contract (draft)**  
+Replace `YOUR_ACCESS_TOKEN` with a valid token from auth-service login.
+```bash
+curl -s -X POST http://localhost:8082/api/v1/contracts \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_category": "web_dev",
+    "project_name": "Company Website",
+    "description": "Landing page + blog",
+    "due_date": "2026-03-01T00:00:00Z",
+    "total_amount": 50000,
+    "currency": "INR",
+    "client_name": "Acme Ltd",
+    "client_company_name": "Acme",
+    "client_email": "client@acme.com",
+    "client_phone": "+919876543210",
+    "terms_and_conditions": "Standard terms.",
+    "milestones": [
+      {"title": "Initial payment", "description": "Advance", "amount": 15000, "is_initial_payment": true},
+      {"title": "Design approval", "description": "Mockups", "amount": 17500, "is_initial_payment": false},
+      {"title": "Final delivery", "description": "Live site", "amount": 17500, "is_initial_payment": false}
+    ]
+  }'
+# Expect: 201, data.status == "draft", data.milestones length 3
+```
+
+**3. List contracts**
+```bash
+curl -s "http://localhost:8082/api/v1/contracts?status=draft&page=1&limit=10" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+# Expect: 200, data.contracts array, data.total >= 0
+```
+
+**4. Get one contract**  
+Use the contract `id` from the create response.
+```bash
+curl -s http://localhost:8082/api/v1/contracts/1 \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+# Expect: 200, data.id, data.status "draft", data.milestones
+```
+
+**5. Update draft**
+```bash
+curl -s -X PUT http://localhost:8082/api/v1/contracts/1 \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"project_name": "Company Website v2", "client_company_name": "Acme Corp"}'
+# Expect: 200, data.project_name "Company Website v2"
+```
+
+**6. Send to client**
+```bash
+curl -s -X POST http://localhost:8082/api/v1/contracts/1/send \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+# Expect: 200, data.status "sent", data.sent_at set
+# If SHAREABLE_LINK_BASE_URL is set: data.shareable_link == base + "/" + id
+```
+
+**7. List sent**
+```bash
+curl -s "http://localhost:8082/api/v1/contracts?status=sent" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+# Expect: 200, data.contracts with status "sent"
+```
+
+**8. Delete draft only**  
+Create another draft (e.g. id 2), then:
+```bash
+curl -s -X DELETE http://localhost:8082/api/v1/contracts/2 \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+# Expect: 200, message "Contract deleted"
+# Sending DELETE for a non-draft contract must return 400 (only draft can be deleted)
+```
+
+### Week 4 completion checklist
+
+- [ ] Health returns 200 and `service: contract-service`
+- [ ] Create contract returns 201 and `status: draft`
+- [ ] List contracts returns 200 with `contracts` and `total`
+- [ ] Get by id returns 200 with full contract and milestones
+- [ ] Update draft returns 200 and updated fields
+- [ ] Send returns 200 and `status: sent`, `sent_at` set
+- [ ] List by `status=sent` shows sent contracts
+- [ ] Delete draft returns 200; delete non-draft returns 4xx
+
+### Phase 3.2: Draft auto-delete, shareable link, email trigger
+
+**Shareable link:** Set `SHAREABLE_LINK_BASE_URL=https://app.example.com/contract` (or leave unset). Send a contract, then GET that contract — when set, response includes `shareable_link` (e.g. `https://app.example.com/contract/1`). When unset, `shareable_link` is empty/omitted.
+
+**Draft auto-delete:** Configurable via `DRAFT_EXPIRY_DAYS` (default 14) and `DRAFT_CLEANUP_INTERVAL_MINS` (default 360). The service logs `[draft-cleanup] deleted N expired draft(s)` when it runs and removes drafts. To verify: create a draft, backdate it in DB (or set `DRAFT_EXPIRY_DAYS=0` and run once for testing), wait for the next job tick or restart with a short interval, and confirm the draft is gone.
+
+**Email trigger:** `NotifyContractSent` is invoked asynchronously after send. Default is no-op; no test required until a real notifier is wired.
+
+**Phase 3.2 checklist**
+
+- [ ] With `SHAREABLE_LINK_BASE_URL` set, send returns `shareable_link` and GET contract returns it when status is sent
+- [ ] Draft-cleanup job runs periodically (observe logs or use short interval for tests)
+- [ ] Drafts older than `DRAFT_EXPIRY_DAYS` are permanently removed (manual DB check or backdate + wait)
+
+---
+
 ### 📊 Expected Test Results Summary
 
 | Test Category | Tests | Passed | Failed |
@@ -1665,7 +1861,7 @@ chmod +x test_phase2.sh
 
 ---
 
-**Document Version:** 3.0  
+**Document Version:** 4.0  
 **Last Updated:** January 24, 2026  
-**Next Update:** After Phase 3 completion
+**Next Update:** After Week 5 (signatures, milestones, IPFS)
 

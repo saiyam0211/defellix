@@ -1,0 +1,83 @@
+package domain
+
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
+
+// ContractStatus represents the lifecycle state of a contract
+const (
+	ContractStatusDraft  = "draft"
+	ContractStatusSent   = "sent"
+	ContractStatusSigned = "signed"   // Week 5+
+	ContractStatusActive = "active"   // Week 5+
+	ContractStatusDone   = "completed"
+	ContractStatusCancel = "cancelled"
+)
+
+// Contract represents a freelancer–client agreement
+type Contract struct {
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	FreelancerUserID uint    `gorm:"index;not null" json:"freelancer_user_id"` // from auth-service users.id
+
+	// Project details
+	ProjectCategory    string    `gorm:"type:varchar(80);not null" json:"project_category"`
+	ProjectName        string    `gorm:"type:varchar(200);not null" json:"project_name"`
+	Description        string    `gorm:"type:text" json:"description"`
+	DueDate            *time.Time `gorm:"type:timestamptz" json:"due_date,omitempty"`
+	TotalAmount        float64   `gorm:"type:decimal(12,2);not null" json:"total_amount"`
+	Currency           string    `gorm:"type:varchar(3);default:INR" json:"currency"`
+	PRDFileURL         string    `gorm:"type:text" json:"prd_file_url,omitempty"`          // PRD PDF URL (IPFS later)
+	SubmissionCriteria string    `gorm:"type:text" json:"submission_criteria,omitempty"`   // submission criteria text
+
+	// Client details
+	ClientName         string `gorm:"type:varchar(120);not null" json:"client_name"`
+	ClientCompanyName  string `gorm:"type:varchar(120)" json:"client_company_name,omitempty"`
+	ClientEmail        string `gorm:"type:varchar(255);not null" json:"client_email"`
+	ClientPhone        string `gorm:"type:varchar(30)" json:"client_phone,omitempty"`
+
+	// Terms
+	TermsAndConditions string `gorm:"type:text" json:"terms_and_conditions,omitempty"`
+
+	// Lifecycle
+	Status   string `gorm:"type:varchar(20);default:draft;index" json:"status"` // draft | sent | signed | active | completed | cancelled
+	SentAt   *time.Time `gorm:"type:timestamptz" json:"sent_at,omitempty"`
+
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// Relations (loaded when needed)
+	Milestones []ContractMilestone `gorm:"foreignKey:ContractID" json:"milestones,omitempty"`
+}
+
+// TableName specifies the table name
+func (Contract) TableName() string {
+	return "contracts"
+}
+
+// ContractMilestone represents a single milestone (payment + deliverable)
+type ContractMilestone struct {
+	ID         uint    `gorm:"primaryKey" json:"id"`
+	ContractID uint    `gorm:"index;not null" json:"contract_id"`
+	OrderIndex int     `gorm:"not null" json:"order_index"` // 0-based
+
+	Title       string  `gorm:"type:varchar(200);not null" json:"title"`
+	Description string  `gorm:"type:text" json:"description,omitempty"`
+	Amount      float64 `gorm:"type:decimal(12,2);not null" json:"amount"`
+	DueDate     *time.Time `gorm:"type:timestamptz" json:"due_date,omitempty"`
+	IsInitialPayment bool `gorm:"default:false" json:"is_initial_payment"`
+
+	// Status (Week 5: submission/approval)
+	Status string `gorm:"type:varchar(20);default:pending" json:"status"` // pending | submitted | approved | paid
+
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// TableName specifies the table name
+func (ContractMilestone) TableName() string {
+	return "contract_milestones"
+}
