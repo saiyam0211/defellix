@@ -333,7 +333,7 @@ function ProfileSetStepper() {
                 <div className="flex justify-center gap-4 sm:gap-6">
                   <div className="shrink-0">
                     <Card onImageUpload={handleImageUpload} />
-                    <p className="text-xs text-gray-500 mt-2 text-center sm:text-left">PNG or JPG up to 5MB. Square images work best.</p>
+                    <p className="text-xs text-gray-500 mt-5 text-center sm:text-left">PNG or JPG up to 5MB. Square images work best.</p>
                   </div>
                 </div>
 
@@ -352,7 +352,7 @@ function ProfileSetStepper() {
                     />
                   </div>
 
-                  <Label htmlFor="location" className="text-sm font-medium text-gray-700 mb-1.5 block">
+                  <Label htmlFor="location" className="text-sm mt-2 font-medium text-gray-700 mb-1.5 block">
                     Location <span className="text-red-500">*</span>
                   </Label>
                   <div className="relative">
@@ -368,7 +368,7 @@ function ProfileSetStepper() {
 
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 -mt-2.5 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="role" className="text-sm font-medium text-gray-700 mb-1.5 block">
                       Role <span className="text-red-500">*</span>
@@ -394,7 +394,7 @@ function ProfileSetStepper() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 -mt-2.5 sm:grid-cols-2 gap-4">
 
                   <div>
                     <Label htmlFor="dateOfBirth" className="text-sm font-medium text-gray-700 mb-1.5 block">
@@ -445,7 +445,7 @@ function ProfileSetStepper() {
                 </div>
 
                 <div>
-                  <Label htmlFor="bio" className="text-sm font-medium text-gray-700 mb-1.5 block">
+                  <Label htmlFor="bio" className="text-sm -mt-2.5 font-medium text-gray-700 mb-1.5 block">
                     Short bio
                   </Label>
                   <textarea
