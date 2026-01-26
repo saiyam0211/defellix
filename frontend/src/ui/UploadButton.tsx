@@ -9,9 +9,25 @@ const Input = ({ onChange }: InputProps) => {
     <StyledWrapper>
       <div className="container">
         <div className="folder">
-          <div className="front-side">
+          <div
+            className="front-side"
+            style={{ cursor: 'pointer' }}
+            onClick={() => {
+              // Find the sibling input and trigger click
+              // (this input will be hidden visually)
+              const input = document.getElementById('front-file-input');
+              if (input) input.click();
+            }}
+          >
             <div className="tip" />
             <div className="cover" />
+            <input
+              id="front-file-input"
+              type="file"
+              style={{ display: 'none' }}
+              onChange={onChange}
+              tabIndex={-1}
+            />
           </div>
           <div className="back-side cover" />
         </div>
