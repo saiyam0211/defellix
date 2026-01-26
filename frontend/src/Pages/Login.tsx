@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
-import { useRef } from "react";
+
 import { cn } from "@/lib/utils";
 import {
   IconBrandGithub,
@@ -12,7 +12,6 @@ import {
 import { FaLinkedin } from "react-icons/fa6";
  
 export default function LoginFormDemo() {
-const checkboxRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
