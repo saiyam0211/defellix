@@ -1,13 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
-import { MdLocationOn, MdBusiness, MdCalendarToday, MdEmail } from 'react-icons/md'
+import { MdLocationOn,  MdCalendarToday, MdEmail } from 'react-icons/md'
 import { FaGithub, FaLinkedin, FaInstagram, FaGlobe, FaTh, FaFileAlt, FaStar } from 'react-icons/fa'
-import { IoChatbubbleOutline } from 'react-icons/io5'
+import { X, Globe as GlobeIcon, Github, Calendar, Users } from 'lucide-react'
+
+interface Project {
+    id: number;
+    name: string;
+    role: string;
+    liveLink: string;
+    duration: string;
+    teamSize: string;
+    techStack: string[];
+    summary: string;
+    highlights: string[];
+    images: string[];
+    githubLink: string;
+}
 
 function Profile() {
     const [activeTab, setActiveTab] = useState('Projects')
+    const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+    const [isProjectModalOpen, setIsProjectModalOpen] = useState(false)
     
-    const user = {
+    // Load data from localStorage or use defaults
+    const [user, setUser] = useState({
         name: "Alex Morgan",
         photo: "https://via.placeholder.com/120",
         headline: "Product Designer",
@@ -22,26 +39,60 @@ function Profile() {
         workingHours: "9am - 5pm",
         experience: "5+ years",
         skills: ["Design systems", "Product thinking", "Prototyping", "User research"],
-        githubLink: "https://github.com/alexmorgan",
+        githubLink: "",
         linkedinLink: "https://linkedin.com/in/alex-morgan",
         portfolioLink: "https://alexmorgan.design",
         instagramLink: "https://instagram.com/alexmorgan",
         stats: {
-            projects: 24,
+            projects: 0,
             files: 134,
             teammates: 18
         },
-        projects: [
-            { name: "NexGen Design System", icon: FaStar, updated: "2 days ago", details: "48 components", role: "Owner" },
-            { name: "Analytics Workspace", icon: FaTh, updated: "5 days ago", details: "Marketing", role: "Contributor" },
-            { name: "Customer Portal", icon: FaFileAlt, updated: "1 week ago", details: "CX", role: "Reviewer" }
-        ],
+        projects: [] as Project[],
         availability: [
             "Available for design reviews on Tue & Thu",
             "Prefers async feedback via comments",
             "Best contact: Slack or in-app messages"
         ]
-    }
+    })
+
+    useEffect(() => {
+        const savedProfile = localStorage.getItem('userProfile');
+        if (savedProfile) {
+            try {
+                const profileData = JSON.parse(savedProfile);
+                setUser({
+                    name: profileData.fullName || user.name,
+                    photo: profileData.profilePicture || user.photo,
+                    headline: profileData.role || user.headline,
+                    role: profileData.role || user.role,
+                    bio: profileData.shortBio || user.bio,
+                    location: profileData.location || user.location,
+                    email: profileData.workEmail || user.email,
+                    profileUrl: profileData.profileUrl || user.profileUrl,
+                    company: profileData.organization || user.company,
+                    joinedDate: profileData.joined || user.joinedDate,
+                    timezone: profileData.timezone || user.timezone,
+                    workingHours: profileData.workingHours || user.workingHours,
+                    experience: user.experience,
+                    skills: profileData.topSkills || user.skills,
+                    githubLink: profileData.projects?.[0]?.githubLink || "",
+                    linkedinLink: profileData.linkedinUrl ? `https://linkedin.com${profileData.linkedinUrl}` : user.linkedinLink,
+                    portfolioLink: profileData.website ? `https://${profileData.website}` : user.portfolioLink,
+                    instagramLink: user.instagramLink,
+                    stats: {
+                        projects: profileData.projects?.length || 0,
+                        files: user.stats.files,
+                        teammates: user.stats.teammates
+                    },
+                    projects: profileData.projects || [],
+                    availability: profileData.preferredCollaboration || user.availability
+                });
+            } catch (error) {
+                console.error('Error parsing profile data:', error);
+            }
+        }
+    }, [])
 
     return (
         <div className="flex h-screen w-full bg-[#fbf9f1]">
@@ -149,7 +200,7 @@ function Profile() {
                                         {user.githubLink && (
                                             <a href={user.githubLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-600 hover:text-teal-600 transition-colors">
                                                 <FaGithub className="text-gray-400" size={14} />
-                                                <span>{user.githubLink.replace('https://github.com/', '')}</span>
+                                                <span>{user.githubLink.replace('https://github.com/', '') || user.githubLink}</span>
                                             </a>
                                         )}
                                     </div>
@@ -181,47 +232,35 @@ function Profile() {
                                 <h2 className="text-xl font-bold text-gray-900 mb-1">Work</h2>
                                 <p className="text-sm text-gray-500 mb-4">Recent projects and activity</p>
                                 
-                                {/* Tabs */}
-                                <div className="flex gap-1 border-b border-gray-200 mb-4">
-                                    {['Projects', 'Activity', 'Files'].map((tab) => (
-                                        <button
-                                            key={tab}
-                                            onClick={() => setActiveTab(tab)}
-                                            className={`px-4 py-2 text-sm font-medium transition-colors ${
-                                                activeTab === tab
-                                                    ? 'text-teal-600 border-b-2 border-teal-600'
-                                                    : 'text-gray-500 hover:text-gray-700'
-                                            }`}
-                                        >
-                                            {tab}
-                                        </button>
-                                    ))}
-                                </div>
-                                
                                 {/* Projects List */}
-                                {activeTab === 'Projects' && (
-                                    <div className="space-y-4">
-                                        {user.projects.map((project, index) => {
-                                            const Icon = project.icon
-                                            return (
-                                                <div key={index} className="flex items-start justify-between p-4 hover:bg-gray-50 rounded-lg transition-colors">
-                                                    <div className="flex items-start gap-3 flex-1">
-                                                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                                                            <Icon className="text-gray-600" size={20} />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <h3 className="font-semibold text-gray-900 mb-1">{project.name}</h3>
-                                                            <p className="text-sm text-gray-500">
-                                                                Updated {project.updated} - {project.details}
-                                                            </p>
-                                                        </div>
+                                <div className="space-y-4">
+                                    {user.projects.length > 0 ? (
+                                        user.projects.map((project, index) => (
+                                            <div 
+                                                key={project.id || index} 
+                                                onClick={() => {
+                                                    setSelectedProject(project);
+                                                    setIsProjectModalOpen(true);
+                                                }}
+                                                className="flex items-start justify-between p-4 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+                                            >
+                                                <div className="flex items-start gap-3 flex-1">
+                                                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                                                        <FaStar className="text-gray-600" size={20} />
                                                     </div>
-                                                    <span className="text-sm text-gray-500 font-medium">{project.role}</span>
+                                                    <div className="flex-1">
+                                                        <h3 className="font-semibold text-gray-900 mb-1">{project.name}</h3>
+                                                        <p className="text-sm text-gray-500">
+                                                            {project.role} • {project.duration} • {project.teamSize}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                            )
-                                        })}
-                                    </div>
-                                )}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-gray-500 text-center py-8">No projects added yet.</p>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Availability Section */}
@@ -242,6 +281,126 @@ function Profile() {
                     </div>
                 </div>
             </div>
+
+            {/* Project Detail Modal */}
+            {isProjectModalOpen && selectedProject && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
+                            <h3 className="text-2xl font-semibold text-gray-900">{selectedProject.name}</h3>
+                            <button
+                                onClick={() => setIsProjectModalOpen(false)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-6 space-y-6">
+                            {/* Project Info */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-sm text-gray-500 mb-1">Your Role</p>
+                                    <p className="text-gray-900 font-medium">{selectedProject.role}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500 mb-1">Duration</p>
+                                    <p className="text-gray-900 font-medium">{selectedProject.duration}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500 mb-1">Team Size</p>
+                                    <p className="text-gray-900 font-medium">{selectedProject.teamSize}</p>
+                                </div>
+                            </div>
+
+                            {/* Links */}
+                            <div className="flex gap-4">
+                                {selectedProject.liveLink && (
+                                    <a 
+                                        href={selectedProject.liveLink} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-teal-600 hover:text-teal-700"
+                                    >
+                                        <GlobeIcon className="w-4 h-4" />
+                                        <span>Live Link</span>
+                                    </a>
+                                )}
+                                {selectedProject.githubLink && (
+                                    <a 
+                                        href={selectedProject.githubLink} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-teal-600 hover:text-teal-700"
+                                    >
+                                        <Github className="w-4 h-4" />
+                                        <span>GitHub</span>
+                                    </a>
+                                )}
+                            </div>
+
+                            {/* Tech Stack */}
+                            {selectedProject.techStack.length > 0 && (
+                                <div>
+                                    <p className="text-sm text-gray-500 mb-2">Technologies/tech Stack used</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedProject.techStack.map((tech, index) => (
+                                            <span
+                                                key={index}
+                                                className="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-full text-sm font-medium"
+                                            >
+                                                {tech}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Project Summary */}
+                            {selectedProject.summary && (
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-700 mb-2">Project Summary</p>
+                                    <p className="text-gray-600 leading-relaxed">{selectedProject.summary}</p>
+                                </div>
+                            )}
+
+                            {/* Key Highlights */}
+                            {selectedProject.highlights.length > 0 && (
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-700 mb-2">Key Highlights & Outcomes</p>
+                                    <ul className="space-y-2">
+                                        {selectedProject.highlights.map((highlight, index) => (
+                                            <li key={index} className="flex items-start gap-2 text-gray-600">
+                                                <span className="text-teal-600 mt-1">•</span>
+                                                <span>{highlight}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* Project Images */}
+                            {selectedProject.images.length > 0 && (
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-700 mb-2">Project Images</p>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        {selectedProject.images.map((image, index) => (
+                                            <img 
+                                                key={index} 
+                                                src={image} 
+                                                alt={`${selectedProject.name} ${index + 1}`}
+                                                className="w-full h-32 object-cover rounded-lg"
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                </div>    
+                </div>
+                </div>
+            )}
         </div>
     )
 }

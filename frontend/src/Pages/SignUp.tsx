@@ -1,4 +1,5 @@
-import React from 'react'
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Link } from "react-router-dom";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
@@ -11,9 +12,12 @@ import {
 import { FaLinkedin } from "react-icons/fa6";
 
 export default function SignUp() {
+    const navigate=useNavigate();
+
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         console.log("Form submitted");
+        navigate('/profile/setup');
     };
 
     return (
@@ -25,17 +29,10 @@ export default function SignUp() {
                 <form className="my-4 sm:my-6 md:my-8" onSubmit={handleSubmit}>
                     <div className="mb-3 sm:mb-4  flex flex-col space-y-2 sm:space-y-3 md:flex-row md:space-y-0 md:space-x-2 lg:space-x-3">
                         <LabelInputContainer>
-                            <Label htmlFor="firstname" className="text-black  text-sm sm:text-base">First name</Label>
+                            <Label htmlFor="firstname" className="text-black  text-sm sm:text-base">Full name</Label>
                             <div className="relative group overflow-hidden rounded-md">
                                 <div className="absolute inset-0 rounded-md bg-teal-600 opacity-0 group-hover:opacity-30 group-hover:scale-105 transition-all duration-500 ease-out pointer-events-none"></div>
                                 <Input id="firstname" placeholder="Tyler" type="text" className="relative z-10 text-black hover:border-teal-500 transition-all duration-300 text-sm sm:text-base h-9 sm:h-10 md:h-11" />
-                            </div>
-                        </LabelInputContainer>
-                        <LabelInputContainer className="text-black">
-                            <Label htmlFor="lastname" className="text-black text-sm sm:text-base">Last name</Label>
-                            <div className="relative group overflow-hidden rounded-md">
-                                <div className="absolute inset-0 rounded-md bg-teal-600 opacity-0 group-hover:opacity-30 group-hover:scale-105 transition-all duration-500 ease-out pointer-events-none"></div>
-                                <Input id="lastname" placeholder="Durden" type="text" className="relative z-10 border border-black hover:border-teal-500 transition-all duration-300 text-sm sm:text-base h-9 sm:h-10 md:h-11" />
                             </div>
                         </LabelInputContainer>
                     </div>
@@ -56,8 +53,20 @@ export default function SignUp() {
 
 
                     <button
-                        className="group/btn relative block h-10 sm:h-11 md:h-12 w-full rounded-md bg-linear-to-br from-black to-neutral-600 font-medium text-sm sm:text-base text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:bg-teal-800 dark:from-teal-900 dark:to-teal-900 dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset]"
                         type="submit"
+                        className={`
+                                group/btn relative block w-full
+                                h-10 sm:h-11 md:h-12
+                                rounded-md
+                                bg-linear-to-br from-black to-neutral-600
+                                font-medium text-sm sm:text-base text-white
+                                shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset]
+                              dark:bg-teal-800 dark:from-teal-900 dark:to-teal-900
+                                dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset]
+                                transform transition-transform duration-150 ease-out
+                                active:scale-95
+                            `
+                        }
                     >
                         Get Started &rarr;
                         <BottomGradient />
@@ -67,7 +76,8 @@ export default function SignUp() {
 
                     <div className="flex flex-col space-y-3 sm:space-y-4">
                         <button
-                            className="group/btn shadow-input relative flex h-10 sm:h-11 md:h-12 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-3 sm:px-4 font-medium text-xs sm:text-sm text-black dark:bg-teal-900 dark:shadow-[0px_0px_1px_1px_#262626]"
+                            className="transform transition-transform duration-150 ease-out
+                                active:scale-95 group/btn shadow-input relative flex h-10 sm:h-11 md:h-12 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-3 sm:px-4 font-medium text-xs sm:text-sm text-black dark:bg-teal-900 dark:shadow-[0px_0px_1px_1px_#262626]"
                             type="submit"
                         >
                             <IconBrandGithub className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-800 dark:text-neutral-300" />
@@ -77,7 +87,8 @@ export default function SignUp() {
                             <BottomGradient />
                         </button>
                         <button
-                            className="group/btn shadow-input relative flex h-10 sm:h-11 md:h-12 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-3 sm:px-4 font-medium text-xs sm:text-sm text-black dark:bg-teal-900 dark:shadow-[0px_0px_1px_1px_#262626]"
+                            className="transform transition-transform duration-150 ease-out
+                                active:scale-95 group/btn shadow-input relative flex h-10 sm:h-11 md:h-12 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-3 sm:px-4 font-medium text-xs sm:text-sm text-black dark:bg-teal-900 dark:shadow-[0px_0px_1px_1px_#262626]"
                             type="submit"
                         >
                             <IconBrandGoogle className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-800 dark:text-neutral-300" />
@@ -87,7 +98,8 @@ export default function SignUp() {
                             <BottomGradient />
                         </button>
                         <button
-                            className="group/btn shadow-input relative flex h-10 sm:h-11 md:h-12 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-3 sm:px-4 font-medium text-xs sm:text-sm text-black dark:bg-teal-900 dark:shadow-[0px_0px_1px_1px_#262626]"
+                            className="transform transition-transform duration-150 ease-out
+                                active:scale-95 group/btn shadow-input relative flex h-10 sm:h-11 md:h-12 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-3 sm:px-4 font-medium text-xs sm:text-sm text-black dark:bg-teal-900 dark:shadow-[0px_0px_1px_1px_#262626]"
                             type="submit"
                         >
                             <FaLinkedin className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-800 dark:text-neutral-300" />
@@ -96,11 +108,12 @@ export default function SignUp() {
                             </span>
                             <BottomGradient />
                         </button>
-                        <Link to="/login" className="no-underline text-black text-center text-xs sm:text-sm md:text-base">
+                        <Link to="/login" className="no-underline text-black text-center text-xs sm:text-sm md:text-base cursor-pointer">
                             Already have an account?
                         </Link>
                     </div>
                 </form>
+                
             </div>
         </div>
     );
