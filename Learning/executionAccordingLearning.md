@@ -1197,7 +1197,15 @@ All except health require `Authorization: Bearer <access_token>` (same token as 
 
 ---
 
+### Phase 3.3: Client view, sign, send for review
+
+**Scope:** Client view by token (no auth), send-for-review (comment → pending), sign (company_address required; optional fields stored). GST validator deferred; wallets/blockchain in 3.4.
+
+**Where:** contract-service. **Token:** UUID set on first send; shareable_link = base + token. **Public routes:** `GET /api/v1/public/contracts/:token`, `POST .../send-for-review`, `POST .../sign`. **Domain:** status `pending`; columns client_view_token, client_review_comment, client_signed_at, client_company_address, client_sign_metadata. **Repo:** FindByClientViewToken, UpdateToPendingByToken, UpdateToSignedByToken. **Service:** GetByClientToken, SendForReview, Sign; validateCompanyAddress (Remote | address | URL). **Re-send:** Update allowed when draft or pending; Send when pending uses UpdateStatusAndSentAt (same token).
+
+---
+
 **Document Version:** 4.0  
 **Last Updated:** January 24, 2026  
-**Next Update:** After Week 5 (signatures, milestones, IPFS)
+**Next Update:** After Phase 3.4 (wallets, blockchain on sign)
 

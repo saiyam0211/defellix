@@ -21,10 +21,13 @@ type ContractRepository interface {
 	UpdateContractOnly(ctx context.Context, c *domain.Contract) error
 	UpdateStatus(ctx context.Context, id uint, freelancerUserID uint, status string) error
 	UpdateStatusAndSentAt(ctx context.Context, id uint, freelancerUserID uint, status string, sentAt *time.Time) error
+	UpdateStatusSentAtAndClientToken(ctx context.Context, id uint, freelancerUserID uint, status string, sentAt *time.Time, clientToken string) error
 	Delete(ctx context.Context, id uint, freelancerUserID uint) error
 	ReplaceMilestones(ctx context.Context, contractID uint, milestones []domain.ContractMilestone) error
-	// DeleteDraftsOlderThan permanently removes draft contracts (and their milestones) with created_at < cutoff. Returns count deleted.
 	DeleteDraftsOlderThan(ctx context.Context, cutoff time.Time) (int64, error)
+	FindByClientViewToken(ctx context.Context, token string) (*domain.Contract, error)
+	UpdateToPendingByToken(ctx context.Context, token, comment string) error
+	UpdateToSignedByToken(ctx context.Context, token string, signedAt *time.Time, companyAddress, signMetadata string) error
 }
 
 type contractRepository struct {
@@ -144,6 +147,23 @@ func (r *contractRepository) UpdateStatusAndSentAt(ctx context.Context, id uint,
 	return nil
 }
 
+func (r *contractRepository) UpdateStatusSentAtAndClientToken(ctx context.Context, id uint, freelancerUserID uint, status string, sentAt *time.Time, clientToken string) error {
+	updates := map[string]interface{}{"status": status, "client_view_token": clientToken}
+	if sentAt != nil {
+		updates["sent_at"] = sentAt
+	}
+	res := r.db.WithContext(ctx).Model(&domain.Contract{}).
+		Where("id = ? AND freelancer_user_id = ?", id, freelancerUserID).
+		Updates(updates)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrContractNotFound
+	}
+	return nil
+}
+
 func (r *contractRepository) Delete(ctx context.Context, id uint, freelancerUserID uint) error {
 	res := r.db.WithContext(ctx).Where("id = ? AND freelancer_user_id = ?", id, freelancerUserID).Delete(&domain.Contract{})
 	if res.Error != nil {
@@ -192,4 +212,51 @@ func (r *contractRepository) DeleteDraftsOlderThan(ctx context.Context, cutoff t
 		return nil
 	})
 	return deleted, err
+}
+
+func (r *contractRepository) FindByClientViewToken(ctx context.Context, token string) (*domain.Contract, error) {
+	if token == "" {
+		return nil, ErrContractNotFound
+	}
+	var c domain.Contract
+	err := r.db.WithContext(ctx).Preload("Milestones", func(db *gorm.DB) *gorm.DB {
+		return db.Order("order_index ASC")
+	}).Where("client_view_token = ?", token).First(&c).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrContractNotFound
+		}
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (r *contractRepository) UpdateToPendingByToken(ctx context.Context, token, comment string) error {
+	res := r.db.WithContext(ctx).Model(&domain.Contract{}).
+		Where("client_view_token = ? AND status = ?", token, domain.ContractStatusSent).
+		Updates(map[string]interface{}{"status": domain.ContractStatusPending, "client_review_comment": comment})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrContractNotFound
+	}
+	return nil
+}
+
+func (r *contractRepository) UpdateToSignedByToken(ctx context.Context, token string, signedAt *time.Time, companyAddress, signMetadata string) error {
+	updates := map[string]interface{}{"status": domain.ContractStatusSigned, "client_company_address": companyAddress, "client_sign_metadata": signMetadata}
+	if signedAt != nil {
+		updates["client_signed_at"] = signedAt
+	}
+	res := r.db.WithContext(ctx).Model(&domain.Contract{}).
+		Where("client_view_token = ? AND status = ?", token, domain.ContractStatusSent).
+		Updates(updates)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrContractNotFound
+	}
+	return nil
 }

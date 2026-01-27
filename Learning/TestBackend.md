@@ -1809,7 +1809,7 @@ curl -s -X DELETE http://localhost:8082/api/v1/contracts/2 \
 
 ### Phase 3.2: Draft auto-delete, shareable link, email trigger
 
-**Shareable link:** Set `SHAREABLE_LINK_BASE_URL=https://app.example.com/contract` (or leave unset). Send a contract, then GET that contract — when set, response includes `shareable_link` (e.g. `https://app.example.com/contract/1`). When unset, `shareable_link` is empty/omitted.
+**Shareable link:** Set `SHAREABLE_LINK_BASE_URL=https://app.example.com/contract` (or leave unset). Send a contract; response includes `shareable_link` = base + token (UUID), e.g. `https://app.example.com/contract/a1b2c3d4-...`. Client uses that URL to view/sign/send-for-review (Phase 3.3).
 
 **Draft auto-delete:** Configurable via `DRAFT_EXPIRY_DAYS` (default 14) and `DRAFT_CLEANUP_INTERVAL_MINS` (default 360). The service logs `[draft-cleanup] deleted N expired draft(s)` when it runs and removes drafts. To verify: create a draft, backdate it in DB (or set `DRAFT_EXPIRY_DAYS=0` and run once for testing), wait for the next job tick or restart with a short interval, and confirm the draft is gone.
 
@@ -1820,6 +1820,49 @@ curl -s -X DELETE http://localhost:8082/api/v1/contracts/2 \
 - [ ] With `SHAREABLE_LINK_BASE_URL` set, send returns `shareable_link` and GET contract returns it when status is sent
 - [ ] Draft-cleanup job runs periodically (observe logs or use short interval for tests)
 - [ ] Drafts older than `DRAFT_EXPIRY_DAYS` are permanently removed (manual DB check or backdate + wait)
+
+### Phase 3.3: Client view, send-for-review, sign (no auth)
+
+**Prereq:** Contract sent (so it has a `client_view_token`). Copy `shareable_link` from send response or from `GET /api/v1/contracts/:id`; the last path segment is the token.
+
+**1. Client view**
+```bash
+# Replace TOKEN with the UUID from shareable_link (last path segment)
+curl -s http://localhost:8082/api/v1/public/contracts/TOKEN
+```
+**Expected:** 200; JSON has project, client, milestones, terms, status; no `freelancer_user_id`. 404 if token invalid.
+
+**2. Send for review**
+```bash
+curl -s -X POST http://localhost:8082/api/v1/public/contracts/TOKEN/send-for-review \
+  -H "Content-Type: application/json" \
+  -d '{"comment":"Please add milestone X."}'
+```
+**Expected:** 200, `"message":"Sent for review"`. Contract status becomes `pending`. Same call again → 409 ALREADY_PENDING.
+
+**3. Freelancer re-send (auth)**
+```bash
+# As freelancer: update if needed, then send again (pending → sent)
+curl -s -X POST http://localhost:8082/api/v1/contracts/CONTRACT_ID/send \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+**Expected:** 200, status `sent`; same token so client link still works.
+
+**4. Client sign**
+```bash
+curl -s -X POST http://localhost:8082/api/v1/public/contracts/TOKEN/sign \
+  -H "Content-Type: application/json" \
+  -d '{"company_address":"Remote"}'
+# Or: "company_address":"123 Main St" or a Google Maps URL
+```
+**Expected:** 200, contract in body, status `signed`. Same call again → 409 ALREADY_SIGNED. Invalid address (e.g. empty) → 400 INVALID_COMPANY_ADDRESS.
+
+**Phase 3.3 checklist**
+
+- [ ] GET /api/v1/public/contracts/:token returns 200 and contract fields (no auth)
+- [ ] POST send-for-review returns 200 and status becomes pending; idempotent 409 when already pending
+- [ ] Freelancer can update when pending and re-send; status goes pending → sent
+- [ ] POST sign with company_address required (Remote | address | URL) returns 200 and status signed; 409 when already signed
 
 ---
 

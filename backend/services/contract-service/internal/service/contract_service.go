@@ -2,11 +2,14 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/saiyam0211/defellix/services/contract-service/internal/domain"
 	"github.com/saiyam0211/defellix/services/contract-service/internal/dto"
 	"github.com/saiyam0211/defellix/services/contract-service/internal/notification"
@@ -14,8 +17,11 @@ import (
 )
 
 var (
-	ErrNotDraft    = errors.New("contract is not in draft status")
-	ErrAlreadySent = errors.New("contract was already sent")
+	ErrNotDraft           = errors.New("contract is not in draft status")
+	ErrAlreadySent        = errors.New("contract was already sent")
+	ErrAlreadySigned      = errors.New("contract was already signed")
+	ErrAlreadyPending     = errors.New("contract is already pending review")
+	ErrInvalidCompanyAddr = errors.New("company_address must be 'Remote', a full address, or a valid URL")
 )
 
 type ContractService struct {
@@ -99,7 +105,7 @@ func (s *ContractService) Update(ctx context.Context, id uint, freelancerUserID 
 	if err != nil {
 		return nil, err
 	}
-	if c.Status != domain.ContractStatusDraft {
+	if c.Status != domain.ContractStatusDraft && c.Status != domain.ContractStatusPending {
 		return nil, ErrNotDraft
 	}
 	applyUpdate(c, req)
@@ -122,22 +128,153 @@ func (s *ContractService) Send(ctx context.Context, id uint, freelancerUserID ui
 	if err != nil {
 		return nil, err
 	}
-	if c.Status != domain.ContractStatusDraft {
-		if c.Status == domain.ContractStatusSent {
-			return nil, ErrAlreadySent
+	now := time.Now()
+	switch c.Status {
+	case domain.ContractStatusSent:
+		return nil, ErrAlreadySent
+	case domain.ContractStatusDraft:
+		clientToken := uuid.New().String()
+		if err := s.repo.UpdateStatusSentAtAndClientToken(ctx, id, freelancerUserID, domain.ContractStatusSent, &now, clientToken); err != nil {
+			return nil, err
 		}
+		c.Status = domain.ContractStatusSent
+		c.SentAt = &now
+		c.ClientViewToken = clientToken
+		shareableLink := s.buildShareableLinkForContract(c)
+		go s.notifier.NotifyContractSent(context.Background(), id, c.ClientEmail, shareableLink)
+		return s.contractToResponse(c), nil
+	case domain.ContractStatusPending:
+		if err := s.repo.UpdateStatusAndSentAt(ctx, id, freelancerUserID, domain.ContractStatusSent, &now); err != nil {
+			return nil, err
+		}
+		c.Status = domain.ContractStatusSent
+		c.SentAt = &now
+		return s.contractToResponse(c), nil
+	default:
 		return nil, ErrNotDraft
 	}
-	now := time.Now()
-	if err := s.repo.UpdateStatusAndSentAt(ctx, id, freelancerUserID, domain.ContractStatusSent, &now); err != nil {
+}
+
+// GetByClientToken returns the contract for the client view (no auth). Token is the client_view_token from the link.
+func (s *ContractService) GetByClientToken(ctx context.Context, token string) (*dto.PublicContractViewResponse, error) {
+	c, err := s.repo.FindByClientViewToken(ctx, token)
+	if err != nil {
 		return nil, err
 	}
-	c.Status = domain.ContractStatusSent
-	c.SentAt = &now
-	shareableLink := s.buildShareableLink(id)
-	// Trigger “email to client” off the hot path; do not block response
-	go s.notifier.NotifyContractSent(context.Background(), id, c.ClientEmail, shareableLink)
-	return s.toResponseWithShareable(c, c.Milestones, shareableLink), nil
+	return toPublicViewResponse(c), nil
+}
+
+// SendForReview sets status to pending and stores the client's comment. Allowed only when status is sent.
+func (s *ContractService) SendForReview(ctx context.Context, token string, req *dto.SendForReviewRequest) error {
+	c, err := s.repo.FindByClientViewToken(ctx, token)
+	if err != nil {
+		return err
+	}
+	if c.Status == domain.ContractStatusPending {
+		return ErrAlreadyPending
+	}
+	if c.Status != domain.ContractStatusSent {
+		return repository.ErrContractNotFound
+	}
+	return s.repo.UpdateToPendingByToken(ctx, token, strings.TrimSpace(req.Comment))
+}
+
+// Sign records client sign with required company_address and optional metadata. Allowed only when status is sent. No blockchain here (3.4).
+func (s *ContractService) Sign(ctx context.Context, token string, req *dto.SignRequest) (*dto.PublicContractViewResponse, error) {
+	if err := validateCompanyAddress(req.CompanyAddress); err != nil {
+		return nil, err
+	}
+	c, err := s.repo.FindByClientViewToken(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	if c.Status == domain.ContractStatusSigned {
+		return nil, ErrAlreadySigned
+	}
+	if c.Status != domain.ContractStatusSent {
+		return nil, repository.ErrContractNotFound
+	}
+	meta := signMetadataFromRequest(req)
+	metaJSON, _ := json.Marshal(meta)
+	now := time.Now()
+	if err := s.repo.UpdateToSignedByToken(ctx, token, &now, strings.TrimSpace(req.CompanyAddress), string(metaJSON)); err != nil {
+		return nil, err
+	}
+	c.Status = domain.ContractStatusSigned
+	c.ClientSignedAt = &now
+	c.ClientCompanyAddress = strings.TrimSpace(req.CompanyAddress)
+	return toPublicViewResponse(c), nil
+}
+
+func validateCompanyAddress(s string) error {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ErrInvalidCompanyAddr
+	}
+	if strings.EqualFold(s, "Remote") {
+		return nil
+	}
+	if len(s) > 500 {
+		return ErrInvalidCompanyAddr
+	}
+	// if it looks like a URL, validate
+	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
+		if u, err := url.Parse(s); err != nil || u.Host == "" {
+			return ErrInvalidCompanyAddr
+		}
+	}
+	return nil
+}
+
+func signMetadataFromRequest(req *dto.SignRequest) map[string]string {
+	m := make(map[string]string)
+	if req.Email != "" {
+		m["email"] = strings.TrimSpace(req.Email)
+	}
+	if req.Phone != "" {
+		m["phone"] = strings.TrimSpace(req.Phone)
+	}
+	if req.CompanyName != "" {
+		m["company_name"] = strings.TrimSpace(req.CompanyName)
+	}
+	if req.GSTNumber != "" {
+		m["gst_number"] = strings.TrimSpace(req.GSTNumber)
+	}
+	if req.BusinessEmail != "" {
+		m["business_email"] = strings.TrimSpace(req.BusinessEmail)
+	}
+	if req.Instagram != "" {
+		m["instagram"] = strings.TrimSpace(req.Instagram)
+	}
+	if req.LinkedIn != "" {
+		m["linkedin"] = strings.TrimSpace(req.LinkedIn)
+	}
+	return m
+}
+
+func toPublicViewResponse(c *domain.Contract) *dto.PublicContractViewResponse {
+	return &dto.PublicContractViewResponse{
+		ID:                  c.ID,
+		ProjectCategory:     c.ProjectCategory,
+		ProjectName:         c.ProjectName,
+		Description:         c.Description,
+		DueDate:             c.DueDate,
+		TotalAmount:         c.TotalAmount,
+		Currency:            c.Currency,
+		PRDFileURL:          c.PRDFileURL,
+		SubmissionCriteria:  c.SubmissionCriteria,
+		ClientName:          c.ClientName,
+		ClientCompanyName:   c.ClientCompanyName,
+		ClientEmail:         c.ClientEmail,
+		ClientPhone:         c.ClientPhone,
+		TermsAndConditions:  c.TermsAndConditions,
+		Status:              c.Status,
+		SentAt:              c.SentAt,
+		ClientReviewComment: c.ClientReviewComment,
+		Milestones:          milestonesToResponse(c.Milestones),
+		CreatedAt:           c.CreatedAt,
+		UpdatedAt:           c.UpdatedAt,
+	}
 }
 
 func (s *ContractService) Delete(ctx context.Context, id uint, freelancerUserID uint) error {
@@ -163,6 +300,17 @@ func (s *ContractService) buildShareableLink(contractID uint) string {
 		return ""
 	}
 	return s.shareableLinkBaseURL + "/" + strconv.FormatUint(uint64(contractID), 10)
+}
+
+// buildShareableLinkForContract returns the client-facing link: base/token when token is set, else base/id.
+func (s *ContractService) buildShareableLinkForContract(c *domain.Contract) string {
+	if s.shareableLinkBaseURL == "" {
+		return ""
+	}
+	if c.Status == domain.ContractStatusSent && c.ClientViewToken != "" {
+		return s.shareableLinkBaseURL + "/" + c.ClientViewToken
+	}
+	return s.shareableLinkBaseURL + "/" + strconv.FormatUint(uint64(c.ID), 10)
 }
 
 func milestonesFromInput(in []dto.MilestoneInput) []domain.ContractMilestone {
@@ -223,10 +371,7 @@ func applyUpdate(c *domain.Contract, req *dto.UpdateContractRequest) {
 }
 
 func (s *ContractService) toResponse(c *domain.Contract, ms []domain.ContractMilestone) *dto.ContractResponse {
-	var shareable string
-	if c.Status == domain.ContractStatusSent && s.shareableLinkBaseURL != "" {
-		shareable = s.buildShareableLink(c.ID)
-	}
+	shareable := s.buildShareableLinkForContract(c)
 	return s.toResponseWithShareable(c, ms, shareable)
 }
 

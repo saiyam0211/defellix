@@ -59,7 +59,7 @@ This section is the canonical user journey. Backend phases and deliverables are 
    - **Send for review** (client writes a comment; contract goes back to freelancer in **pending** state; freelancer edits and sends again).
 
 **Backend:** Contract service — client-facing read endpoint (by token or public link), “send for review” (comment + status `pending`), “sign” (see below).  
-**Status:** ❌ Not started.
+**Status:** ✅ Done: `GET/POST /api/v1/public/contracts/:token` (view, send-for-review, sign). Wallets and blockchain on sign in 3.4.
 
 ---
 
@@ -195,14 +195,22 @@ This section is the canonical user journey. Backend phases and deliverables are 
 - [x] `NotifyContractSent` trigger on send (internal/notification; NoopNotifier default)  
 - [x] Env: `SHAREABLE_LINK_BASE_URL`, `DRAFT_EXPIRY_DAYS`, `DRAFT_CLEANUP_INTERVAL_MINS`  
 
-#### 3.3 Client: view, sign, send for review ❌ NOT STARTED
+#### 3.3 Client: view, sign, send for review ✅ DONE (GST validator deferred)
 
 | Item | Status | Notes |
 |------|--------|--------|
-| Client view contract by link/token | ❌ | No login required for view; token in URL or magic link |
-| Client sign: required/optional fields | ❌ | Email, phone prefill; address required (remote/address/maps URL); optional GST, business mail, Instagram, LinkedIn |
-| GST number validator | ❌ | Optional; integration or rule set TBD |
-| Send for review (comment, status pending) | ❌ | Freelancer can update and re-send |
+| Client view contract by link/token | ✅ | `GET /api/v1/public/contracts/:token` (no auth); token = UUID set on send |
+| Client sign: required/optional fields | ✅ | `POST .../sign`; company_address required (Remote / address / URL); email, phone, gst, etc. optional; stored in client_sign_metadata |
+| GST number validator | ⏸️ | Deferred; optional fields accepted and stored; pluggable validator later |
+| Send for review (comment, status pending) | ✅ | `POST .../send-for-review`; status→pending; freelancer can update (allowed when pending) and re-send (pending→sent) |
+
+**Deliverables:**  
+- [x] `client_view_token` (UUID) set on send; shareable_link = base + token  
+- [x] `GET /api/v1/public/contracts/:token` — public view (no auth)  
+- [x] `POST /api/v1/public/contracts/:token/send-for-review` — body `{ "comment": "..." }`  
+- [x] `POST /api/v1/public/contracts/:token/sign` — body: `company_address` required; optional email, phone, company_name, gst_number, business_email, instagram, linkedin  
+- [x] Update/Put draft allowed when status = pending (freelancer edits before re-send); Send allowed when pending (re-send)  
+- [x] Domain: status `pending`; columns client_view_token, client_review_comment, client_signed_at, client_company_address, client_sign_metadata  
 
 #### 3.4 Wallets & blockchain on sign ❌ NOT STARTED
 

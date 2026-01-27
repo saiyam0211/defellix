@@ -10,8 +10,8 @@
 
 - **Auth:** ✅ Done (login/signup, JWT, OAuth).
 - **User:** ✅ Done (profile CRUD, skills, projects, search). Pending: `user_name`, public profile, visibility.
-- **Contract:** ✅ Create/update/list/get, save as draft, send to client, delete draft.  
-  ❌ Pending: draft 14-day auto-delete, shareable link, email on send, client view/sign/send-for-review, wallets, blockchain on sign.
+- **Contract:** ✅ Create/update/list/get, save as draft, send to client, delete draft, draft auto-delete, shareable link, email trigger, **client view by token**, **send-for-review**, **sign** (status + client fields; blockchain in 3.4).  
+  ❌ Pending: wallets, blockchain on sign (3.4).
 
 ---
 
@@ -19,42 +19,35 @@
 
 Do these in sequence so each step has a clear input/output.
 
-### 1. Draft auto-delete (14 days)
+### 1. Draft auto-delete (14 days) ✅ DONE (Phase 3.2)
 
 - **What:** Remove contracts with `status = draft` and `updated_at` (or `created_at`) older than 14 days.
 - **Where:** Contract service (or a small jobs runner that calls contract-service logic).
 - **How:** Cron or internal ticker; use a single DB query + delete in a transaction. Idempotent and safe to run daily/hourly.
 - **Rules:** [RULES_OF_BACKEND.md](./RULES_OF_BACKEND.md) — jobs off hot path, no PII in logs.
 
----
-
-### 2. Send experience: shareable link + email
-
-- **Shareable link:** For a contract in `sent` (or after send), expose a URL the freelancer can copy. Example: `GET /api/v1/contracts/:id/share-link` returning `{ "url": "https://ourdomain.com/contract/xxx" }` where `xxx` is a UUID or signed token. Frontend uses this for “Copy link”.
-- **Email on send:** When `POST /api/v1/contracts/:id/send` succeeds, enqueue or call a notification step that sends email to `contract.client_email` with the same link (or magic link). Don’t block the send API on email delivery.
+**Implemented:** Contract-service `DeleteDraftsOlderThan` (repo, by `created_at`), `DeleteExpiredDrafts` (service), `job.DraftCleanupRunner` (internal ticker). Env: `DRAFT_EXPIRY_DAYS`, `DRAFT_CLEANUP_INTERVAL_MINS`. See [execution.md](./execution.md) §3.2.
 
 ---
 
-### 3. Client: view contract by link
+### 2. Send experience: shareable link + email ✅ DONE (Phase 3.2)
+
+- **Shareable link:** For a contract in `sent` (or after send), expose a URL the freelancer can copy. **Done:** `shareable_link` in send response and in GET contract when `SHAREABLE_LINK_BASE_URL` is set (e.g. `https://app.ourdomain.com/contract/:id`). Frontend uses this for “Copy link”.
+- **Email on send:** When `POST /api/v1/contracts/:id/send` succeeds, **Done:** `ContractNotifier.NotifyContractSent` triggered in a goroutine; no-op by default. Send API is not blocked.
+
+---
+
+### 3. Client: view contract by link ✅ DONE (Phase 3.3)
 
 - **What:** Client opens the contract via the shareable link (no login required for view).
-- **Backend:** 
-  - Public or tokenised endpoint, e.g. `GET /api/v1/public/contracts/:token` that returns contract details needed for the “view + sign or send for review” screen.
-  - Token should be a UUID or signed payload (e.g. contract_id + expiry) so it can’t be guessed.
+- **Done:** `GET /api/v1/public/contracts/:token` returns contract details for view + sign or send-for-review. Token is UUID set when freelancer sends; shareable_link = base + token.
 
 ---
 
-### 4. Client: sign or send for review
+### 4. Client: sign or send for review ✅ DONE (Phase 3.3)
 
-- **Sign:**  
-  - Accept payload: required fields (e.g. company address: remote | full address | Google Maps URL), optional (GST, business mail, Instagram, LinkedIn).  
-  - Validate (e.g. GST format if implemented).  
-  - Then: create/use wallets, write contract to blockchain, save tx id/hash/timestamp/deadline/amount/gas, set status `signed`.  
-  - Do not require the user to manage keys; wallets are created/used by the backend.
-
-- **Send for review:**  
-  - Client sends a comment; status becomes e.g. `pending_review`.  
-  - Freelancer can update contract and call “send” again; client sees updated version and can sign or send for review again.
+- **Sign:** **Done:** `POST /api/v1/public/contracts/:token/sign` — company_address required (Remote | address | URL); optional email, phone, gst_number, business_email, instagram, linkedin stored in client_sign_metadata. Status → signed. GST validator deferred; wallets and blockchain in 3.4.
+- **Send for review:** **Done:** `POST /api/v1/public/contracts/:token/send-for-review` with `{ "comment": "..." }`; status → pending. Freelancer can update (allowed when pending) and Send again (pending → sent).
 
 ---
 

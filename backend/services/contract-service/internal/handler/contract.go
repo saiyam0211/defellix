@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -33,6 +34,12 @@ func (h *ContractHandler) RegisterRoutes(r chi.Router, authMw func(http.Handler)
 			r.Post("/{id}/send", h.Send)
 			r.Delete("/{id}", h.Delete)
 		})
+	})
+	// Public contract routes (no auth): client view, send-for-review, sign
+	r.Route("/api/v1/public/contracts", func(r chi.Router) {
+		r.Get("/{token}", h.GetByClientToken)
+		r.Post("/{token}/send-for-review", h.SendForReview)
+		r.Post("/{token}/sign", h.Sign)
 	})
 }
 
@@ -167,4 +174,82 @@ func (h *ContractHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondSuccess(w, http.StatusOK, map[string]string{"message": "Contract deleted"}, "OK")
+}
+
+// GetByClientToken returns the contract for client view (no auth). Token from URL.
+func (h *ContractHandler) GetByClientToken(w http.ResponseWriter, r *http.Request) {
+	token := chi.URLParam(r, "token")
+	if token == "" {
+		respondError(w, http.StatusBadRequest, "Missing token", "BAD_REQUEST")
+		return
+	}
+	out, err := h.svc.GetByClientToken(r.Context(), token)
+	if err != nil {
+		if errors.Is(err, repository.ErrContractNotFound) {
+			respondError(w, http.StatusNotFound, "Contract not found", "NOT_FOUND")
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "Failed to get contract", "INTERNAL_ERROR")
+		return
+	}
+	respondSuccess(w, http.StatusOK, out, "OK")
+}
+
+// SendForReview submits the client's comment and sets status to pending (no auth).
+func (h *ContractHandler) SendForReview(w http.ResponseWriter, r *http.Request) {
+	token := chi.URLParam(r, "token")
+	if token == "" {
+		respondError(w, http.StatusBadRequest, "Missing token", "BAD_REQUEST")
+		return
+	}
+	var req dto.SendForReviewRequest
+	if err := h.validator.ValidateJSON(r, &req); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error(), "VALIDATION_ERROR")
+		return
+	}
+	if err := h.svc.SendForReview(r.Context(), token, &req); err != nil {
+		if errors.Is(err, repository.ErrContractNotFound) {
+			respondError(w, http.StatusNotFound, "Contract not found", "NOT_FOUND")
+			return
+		}
+		if errors.Is(err, service.ErrAlreadyPending) {
+			respondError(w, http.StatusConflict, "Contract is already pending review", "ALREADY_PENDING")
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "Failed to send for review", "INTERNAL_ERROR")
+		return
+	}
+	respondSuccess(w, http.StatusOK, map[string]string{"message": "Sent for review"}, "OK")
+}
+
+// Sign records client sign (no auth). Required: company_address. Optional: email, phone, gst, etc. Blockchain in 3.4.
+func (h *ContractHandler) Sign(w http.ResponseWriter, r *http.Request) {
+	token := chi.URLParam(r, "token")
+	if token == "" {
+		respondError(w, http.StatusBadRequest, "Missing token", "BAD_REQUEST")
+		return
+	}
+	var req dto.SignRequest
+	if err := h.validator.ValidateJSON(r, &req); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error(), "VALIDATION_ERROR")
+		return
+	}
+	out, err := h.svc.Sign(r.Context(), token, &req)
+	if err != nil {
+		if errors.Is(err, repository.ErrContractNotFound) {
+			respondError(w, http.StatusNotFound, "Contract not found", "NOT_FOUND")
+			return
+		}
+		if errors.Is(err, service.ErrAlreadySigned) {
+			respondError(w, http.StatusConflict, "Contract was already signed", "ALREADY_SIGNED")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidCompanyAddr) {
+			respondError(w, http.StatusBadRequest, err.Error(), "INVALID_COMPANY_ADDRESS")
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "Failed to sign contract", "INTERNAL_ERROR")
+		return
+	}
+	respondSuccess(w, http.StatusOK, out, "Contract signed")
 }

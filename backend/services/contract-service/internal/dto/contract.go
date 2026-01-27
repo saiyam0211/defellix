@@ -99,3 +99,45 @@ type ListContractsQuery struct {
 	Page   int    `json:"page"`
 	Limit  int    `json:"limit"`
 }
+
+// PublicContractViewResponse is returned by GET /api/v1/public/contracts/:token (no auth). Safe for client view.
+type PublicContractViewResponse struct {
+	ID                  uint                 `json:"id"`
+	ProjectCategory     string               `json:"project_category"`
+	ProjectName         string               `json:"project_name"`
+	Description         string               `json:"description"`
+	DueDate             *time.Time           `json:"due_date,omitempty"`
+	TotalAmount         float64              `json:"total_amount"`
+	Currency            string               `json:"currency"`
+	PRDFileURL          string               `json:"prd_file_url,omitempty"`
+	SubmissionCriteria  string               `json:"submission_criteria,omitempty"`
+	ClientName          string               `json:"client_name"`
+	ClientCompanyName   string               `json:"client_company_name,omitempty"`
+	ClientEmail         string               `json:"client_email"`
+	ClientPhone         string               `json:"client_phone,omitempty"`
+	TermsAndConditions  string               `json:"terms_and_conditions,omitempty"`
+	Status              string               `json:"status"`
+	SentAt              *time.Time           `json:"sent_at,omitempty"`
+	ClientReviewComment string               `json:"client_review_comment,omitempty"` // set when status is pending
+	Milestones          []MilestoneResponse  `json:"milestones"`
+	CreatedAt           time.Time            `json:"created_at"`
+	UpdatedAt           time.Time            `json:"updated_at"`
+}
+
+// SendForReviewRequest is the body for POST /api/v1/public/contracts/:token/send-for-review
+type SendForReviewRequest struct {
+	Comment string `json:"comment" validate:"required,max=2000"`
+}
+
+// SignRequest is the body for POST /api/v1/public/contracts/:token/sign
+// CompanyAddress is required: "Remote" | full address | Google Maps URL. GST and other fields optional (flexible for later).
+type SignRequest struct {
+	CompanyAddress string `json:"company_address" validate:"required,max=500"`
+	Email          string `json:"email,omitempty" validate:"omitempty,email,max=255"`
+	Phone          string `json:"phone,omitempty" validate:"omitempty,max=30"`
+	CompanyName    string `json:"company_name,omitempty" validate:"omitempty,max=120"`
+	GSTNumber      string `json:"gst_number,omitempty" validate:"omitempty,max=20"`
+	BusinessEmail  string `json:"business_email,omitempty" validate:"omitempty,email,max=255"`
+	Instagram      string `json:"instagram,omitempty" validate:"omitempty,max=100"`
+	LinkedIn       string `json:"linkedin,omitempty" validate:"omitempty,url,max=300"`
+}

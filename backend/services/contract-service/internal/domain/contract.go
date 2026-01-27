@@ -8,12 +8,13 @@ import (
 
 // ContractStatus represents the lifecycle state of a contract
 const (
-	ContractStatusDraft  = "draft"
-	ContractStatusSent   = "sent"
-	ContractStatusSigned = "signed"   // Week 5+
-	ContractStatusActive = "active"   // Week 5+
-	ContractStatusDone   = "completed"
-	ContractStatusCancel = "cancelled"
+	ContractStatusDraft   = "draft"
+	ContractStatusSent    = "sent"
+	ContractStatusPending = "pending" // client sent for review; freelancer can update and re-send
+	ContractStatusSigned  = "signed"
+	ContractStatusActive  = "active"
+	ContractStatusDone    = "completed"
+	ContractStatusCancel  = "cancelled"
 )
 
 // Contract represents a freelancer–client agreement
@@ -41,8 +42,15 @@ type Contract struct {
 	TermsAndConditions string `gorm:"type:text" json:"terms_and_conditions,omitempty"`
 
 	// Lifecycle
-	Status   string `gorm:"type:varchar(20);default:draft;index" json:"status"` // draft | sent | signed | active | completed | cancelled
+	Status   string `gorm:"type:varchar(20);default:draft;index" json:"status"` // draft | sent | pending | signed | active | completed | cancelled
 	SentAt   *time.Time `gorm:"type:timestamptz" json:"sent_at,omitempty"`
+
+	// Client view & actions (no auth): token set when contract is sent; used in /public/contracts/:token
+	ClientViewToken       string     `gorm:"type:varchar(64);uniqueIndex" json:"client_view_token,omitempty"`
+	ClientReviewComment string `gorm:"type:text" json:"client_review_comment,omitempty"` // set when client sends for review
+	ClientSignedAt   *time.Time `gorm:"type:timestamptz" json:"client_signed_at,omitempty"`
+	ClientCompanyAddress string `gorm:"type:varchar(500)" json:"client_company_address,omitempty"` // required on sign: Remote | address | maps URL
+	ClientSignMetadata string  `gorm:"type:text" json:"-"` // JSON: optional gst_number, business_email, instagram, linkedin etc.; flexible for later
 
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
